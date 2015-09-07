@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+@author: Frank Brehm
+@contact: frank@brehm-online.com
+@copyright: © 2010 - 2015 by Frank Brehm, Berlin
+@license: GPL3
+@summary: Script for backing up a directory to a FTP server
+"""
+
+# Standard modules
+import sys
+import os
+import logging
+
+# own modules:
+cur_dir = os.getcwd()
+base_dir = cur_dir
+
+if sys.argv[0] != '' and sys.argv[0] != '-c':
+    cur_dir = os.path.dirname(sys.argv[0])
+if os.path.exists(os.path.join(cur_dir, '..', 'lib')):
+    libdir = os.path.abspath(os.path.join(cur_dir, '..', 'lib'))
+    if os.path.exists(os.path.join(libdir, 'ftp_backup')):
+        moduledir = os.path.join(libdir, 'ftp_backup')
+        if os.path.exists(os.path.join(moduledir, '__index__.py')):
+            sys.path.insert(0, libdir)
+
+from pb_base.common import pp
+
+
+sys.exit(0)
+
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
