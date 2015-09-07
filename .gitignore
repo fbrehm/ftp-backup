@@ -1,0 +1,10 @@
+*.swp
+*.old
+*.pyc
+*.egg
+*-stamp
+*.bak
+build
+trace
+MANIFEST
+.idea

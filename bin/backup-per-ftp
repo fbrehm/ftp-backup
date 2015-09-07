@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 @author: Frank Brehm
@@ -23,11 +23,20 @@ if os.path.exists(os.path.join(cur_dir, '..', 'lib')):
     libdir = os.path.abspath(os.path.join(cur_dir, '..', 'lib'))
     if os.path.exists(os.path.join(libdir, 'ftp_backup')):
         moduledir = os.path.join(libdir, 'ftp_backup')
-        if os.path.exists(os.path.join(moduledir, '__index__.py')):
+        if os.path.exists(os.path.join(moduledir, '__init__.py')):
             sys.path.insert(0, libdir)
 
 from pb_base.common import pp
 
+from ftp_backup.by_ftp_app import BackupByFtpApp
+
+appname = 'backup-per-ftp'
+app = BackupByFtpApp(appname)
+
+if app.verbose > 2:
+    print("BackupByFtpApp-Application object:" + (("\n%s") % (app)))
+
+app()
 
 sys.exit(0)
 
