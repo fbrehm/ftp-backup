@@ -14,11 +14,13 @@ import textwrap
 import os
 import ftplib
 import ssl
+import re
+from datetime import datetime
 
 # Third party modules
 
 # Own modules
-from pb_base.common import to_bool
+from pb_base.common import to_bool, pp
 from pb_base.app import PbApplicationError
 
 from pb_base.cfg_app import PbCfgAppError
@@ -304,7 +306,39 @@ class BackupByFtpApp(PbCfgApp):
     def _run(self):
         """The underlaying startpoint of the application."""
 
+        re_backup_dirs = re.compile(r'^\d{4}[-_\s]+\d\d[-_\s]+\d\d[-_\s]+\d+$')
+
         self.login_ftp()
+
+        self.ftp.cwd(self.ftp_remote_dir)
+
+        cur_backup_dirs = []
+
+        dirs = self.ftp.nlst()
+        for entry in dirs:
+            if self.verbose > 3:
+                LOG.debug("Entry in FTP dir:\n%s", pp(entry))
+            if re_backup_dirs.search(entry):
+                cur_backup_dirs.append(entry)
+            else:
+                LOG.debug("FTP-Entry %r is not a valid backup directory.", entry)
+        if self.verbose > 1:
+            LOG.debug("Found backup directories:\n%s", pp(cur_backup_dirs))
+
+        cur_date = datetime.utcnow()
+        backup_dir_tpl = cur_date.strftime('%Y-%m-%d_%%02d')
+        LOG.debug("Backup directory template: %r", backup_dir_tpl)
+
+        # Retrieving new backup directory
+        new_backup_dir = None
+        i = 0
+        found = False
+        while not found:
+            new_backup_dir = backup_dir_tpl % (i)
+            if not new_backup_dir in cur_backup_dirs:
+                found = True
+        LOG.info("New backup directory: %r", new_backup_dir)
+        cur_backup_dirs.append(new_backup_dir)
 
     # -------------------------------------------------------------------------
     def post_run(self):
