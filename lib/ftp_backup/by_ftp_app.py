@@ -12,6 +12,8 @@
 import logging
 import textwrap
 import os
+import ftplib
+import ssl
 
 # Third party modules
 
@@ -33,6 +35,8 @@ DEFAULT_FTP_PWD = 'frank@brehm-online.com'
 DEFAULT_FTP_PASSIVE = False
 DEFAULT_FTP_DIR = '/backup'
 DEFAULT_FTP_TZ = 'UTC'
+
+DEFAULT_FTP_TIMEOUT = 60
 
 DEFAULT_LOCAL_DIRECTORY = os.sep + os.path.join('var', 'backup')
 
@@ -63,6 +67,13 @@ class BackupByFtpApp(PbCfgApp):
         self.ftp_passive = DEFAULT_FTP_PASSIVE
         self.ftp_remote_dir = DEFAULT_FTP_DIR
         self.ftp_tz = DEFAULT_FTP_TZ
+        self.ftp_tls = False
+        self.ftp_timeout = DEFAULT_FTP_TIMEOUT
+
+        self.connected = False
+        self.logged_in = False
+
+        self.ftp = None
 
         self.local_directory = DEFAULT_LOCAL_DIRECTORY
 
@@ -84,7 +95,17 @@ class BackupByFtpApp(PbCfgApp):
         )
         self.post_init()
 
+        self.init_ftp()
+
         self.initialized = True
+
+    # -------------------------------------------------------------------------
+    def __del__(self):
+
+        if self.ftp and self.connected:
+            self.ftp.quit()
+
+        self.ftp = None
 
     # -------------------------------------------------------------------------
     def init_arg_parser(self):
@@ -103,6 +124,9 @@ class BackupByFtpApp(PbCfgApp):
         h = "The TCP port on the FTP server of the listening FTP daemon (default: %d)." % (
             DEFAULT_FTP_PORT)
         ftp_group.add_argument('--port', metavar='PORT', type=int, help=h)
+
+        h = "Use TLS for communication with the FTP server (default: False)."
+        ftp_group.add_argument('--tls', action='store_true', help=h)
 
         h = 'The username on the FTP server (default: %r).' % (DEFAULT_FTP_PWD)
         ftp_group.add_argument('--user', metavar='USER', help=h)
@@ -145,6 +169,8 @@ class BackupByFtpApp(PbCfgApp):
             self.ftp_host = self.args.host
         if self.args.port and self.args.port > 0:
             self.ftp_port = self.args.port
+        if self.args.tls:
+            self.ftp_tls = True
         if self.args.user:
             self.ftp_user = self.args.user
         if self.args.password:
@@ -191,6 +217,8 @@ class BackupByFtpApp(PbCfgApp):
                         LOG.error(msg)
                     else:
                         self.ftp_port = p
+                if 'tls' in self.cfg[section] and not self.args.tls:
+                    self.ftp_tls = to_bool(self.cfg[section]['tls'])
                 if 'user' in self.cfg[section] and not self.args.user:
                     self.ftp_user = self.cfg[section]['user']
                 if 'password' in self.cfg[section] and not self.args.password:
@@ -241,10 +269,56 @@ class BackupByFtpApp(PbCfgApp):
                         self.copies['daily'] = v
 
     # -------------------------------------------------------------------------
+    def init_ftp(self):
+
+        LOG.debug("Initializing FTP object ...")
+        if not self.ftp_tls:
+            self.ftp = ftplib.FTP(timeout=self.ftp_timeout)
+        else:
+            context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            context.verify_mode = ssl.CERT_NONE
+            self.ftp = ftplib.FTP_TLS(context=context, timeout=self.ftp_timeout)
+
+        if self.verbose > 1:
+            if self.verbose > 2:
+                self.ftp.set_debuglevel(2)
+            else:
+                self.ftp.set_debuglevel(1)
+
+    # -------------------------------------------------------------------------
+    def login_ftp(self):
+
+        LOG.info("Connecting to FTP server %r (port %d) ...", self.ftp_host, self.ftp_port)
+        self.ftp.connect(host=self.ftp_host, port=self.ftp_port)
+        self.connected = True
+
+        msg = self.ftp.getwelcome()
+        if msg:
+            LOG.info("Welcome message: %s", msg)
+
+        LOG.info("Logging in as %r ...", self.ftp_user)
+        self.ftp.login(user=self.ftp_user, passwd=self.ftp_password)
+        self.logged_in = True
+
+    # -------------------------------------------------------------------------
     def _run(self):
         """The underlaying startpoint of the application."""
 
-        LOG.info("Da da da...")
+        self.login_ftp()
+
+    # -------------------------------------------------------------------------
+    def post_run(self):
+        """
+        Dummy function to run after the main routine.
+        Could be overwritten by descendant classes.
+
+        """
+
+        if self.ftp and self.connected:
+            LOG.info("Disconnecting from %r ...", self.ftp_host)
+            self.ftp.quit()
+
+        self.ftp = None
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
