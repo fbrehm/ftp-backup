@@ -28,7 +28,7 @@ from pb_base.cfg_app import PbCfgApp
 
 import ftp_backup
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
