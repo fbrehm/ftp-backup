@@ -92,46 +92,46 @@ class EntryPermissions(object):
     @classmethod
     def to_int(cls, permission):
 
-        permission = 0
+        perm = 0
         v = to_str(permission)
         match = cls.re_from_str.search(v)
         if match:
             if match.group(1) != '-':
-                permission | STAT_ISDIR
+                perm | STAT_ISDIR
             if match.group(2) != '-':
-                permission | STAT_RUSR
+                perm | STAT_RUSR
             if match.group(3) != '-':
-                permission | STAT_WUSR
+                perm | STAT_WUSR
             if match.group(4) != '-':
-                permission | STAT_XUSR
+                perm | STAT_XUSR
             if match.group(5) != '-':
-                permission | STAT_RGRP
+                perm | STAT_RGRP
             if match.group(6) != '-':
-                permission | STAT_WGRP
+                perm | STAT_WGRP
             if match.group(7) != '-':
-                permission | STAT_XGRP
+                perm | STAT_XGRP
             if match.group(8) != '-':
-                permission | STAT_ROTH
+                perm | STAT_ROTH
             if match.group(9) != '-':
-                permission | STAT_WOTH
+                perm | STAT_WOTH
             if match.group(10) != '-':
-                permission | STAT_XOTH
-            return permission
+                perm | STAT_XOTH
+            return perm
 
         match = cls.re_dec.search(v)
         if match:
-            permission = int(match.group(1))
-            return permission
+            perm = int(match.group(1))
+            return perm
         
         match = cls.re_oct.search(v)
         if match:
-            permission = int(match.group(1), 8)
-            return permission
+            perm = int(match.group(1), 8)
+            return perm
         
         match = cls.re_hex.search(v)
         if match:
-            permission = int(match.group(1), 16)
-            return permission
+            perm = int(match.group(1), 16)
+            return perm
 
         msg = "Invalid permission %r." % (permission)
         raise ValueError(msg)
