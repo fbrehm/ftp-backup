@@ -24,7 +24,7 @@ from pb_base.common import to_str_or_bust as to_str
 from pb_base.object import PbBaseObjectError
 from pb_base.object import PbBaseObject
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 LOG = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class EntryPermissions(object):
     def __init__(self, permission):
 
         self._permission = 0
-        self.set_permission(permission)
+        self._set_permission(permission)
 
     # -----------------------------------------------------------
     @property
@@ -71,10 +71,10 @@ class EntryPermissions(object):
 
     @permission.setter
     def permission(self, permission):
-        self.set_permission(permission)
+        self._set_permission(permission)
 
     # -------------------------------------------------------------------------
-    def set_permission(self, permission):
+    def _set_permission(self, permission):
 
         if isinstance(permission, int):
             if permission < 0:
@@ -199,6 +199,10 @@ class EntryPermissions(object):
         return out
 
     # -------------------------------------------------------------------------
+    def oct(self):
+        return "0o%04o" % (self.permission)
+
+    # -------------------------------------------------------------------------
     def is_dir(self):
         if self.permission & STAT_ISDIR:
             return True
@@ -253,5 +257,258 @@ class EntryPermissions(object):
     # -------------------------------------------------------------------------
     def other_has_exec_access(self):
         return self.access(STAT_XOTH)
+
+
+# =============================================================================
+class DirEntry(PbBaseObject):
+
+    # drwx---r-x   2 b082473  cust         8192 Jan  1  2014 2014-01-01_00
+    # drwx---r-x   2 b082473  cust         8192 May  1 08:20 2015-05-01_00
+    pat_dir_line = r'^(\S{10})\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+'
+    pat_dir_line += r'(\S+\s+\S+\s+\S+)\s+(.*)'
+    re_dir_line = re.compile(pat_dir_line)
+
+    def __init__(
+        self, name=None, perms=None, num_hardlinks=None, user=None, group=None,
+            size=None, mtime=None, appname=None, verbose=0, initialized=False):
+
+        self._name = None 
+        self._perms = EntryPermissions(0)
+        self._num_hardlinks = None
+        self._user = None
+        self._group = None
+        self._size = 0
+        self._mtime = None
+
+        super(DirEntry, self).__init__(
+            appname=appname,
+            verbose=verbose,
+            version=__version__,
+            initialized=False,
+        )
+
+        if name is not None:
+            self.name = name
+
+        if perms is not None:
+            self.perms = perms
+
+        if num_hardlinks is not None:
+            self.num_hardlinks = num_hardlinks
+
+        if user is not None:
+            self.user = user
+
+        if group is not None:
+            self.group = group
+
+        if size is not None:
+            self.size = size
+
+        if mtime is not None:
+            self.mtime = mtime
+
+        self.initialized = initialized
+
+    # -----------------------------------------------------------
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, val):
+        if isinstance(val, six.string_types) or isinstance(val, six.binary_type):
+            self._name = to_str(val)
+        else:
+            msg = "Invalid FTP entry name %r." % (val)
+            raise ValueError(msg)
+
+    # -----------------------------------------------------------
+    @property
+    def perms(self):
+        return self._perms
+
+    @perms.setter
+    def perms(self, val):
+        self._perms = EntryPermissions(val)
+
+    # -----------------------------------------------------------
+    @property
+    def num_hardlinks(self):
+        return self._num_hardlinks
+
+    @num_hardlinks.setter
+    def num_hardlinks(self, val):
+        v = int(val)
+        if v < 0:
+            msg = "Invalid number of hardlinks %r." % (val)
+            raise ValueError(msg)
+        self._num_hardlinks = v
+
+    # -----------------------------------------------------------
+    @property
+    def user(self):
+        return self._user
+
+    @user.setter
+    def user(self, val):
+        if isinstance(val, six.string_types) or isinstance(val, six.binary_type):
+            self._user = to_str(val)
+        else:
+            msg = "Invalid FTP user name %r." % (val)
+            raise ValueError(msg)
+
+    # -----------------------------------------------------------
+    @property
+    def group(self):
+        return self._group
+
+    @group.setter
+    def group(self, val):
+        if isinstance(val, six.string_types) or isinstance(val, six.binary_type):
+            self._group = to_str(val)
+        else:
+            msg = "Invalid FTP group name %r." % (val)
+            raise ValueError(msg)
+
+    # -----------------------------------------------------------
+    @property
+    def size(self):
+        return self._size
+
+    @size.setter
+    def size(self, val):
+        v = int(val)
+        if v < 0:
+            msg = "Invalid size of the FTP entry %r." % (val)
+            raise ValueError(msg)
+        self._size = v
+
+    # -----------------------------------------------------------
+    @property
+    def mtime(self):
+        return self._mtime
+
+    @mtime.setter
+    def mtime(self, val):
+        if isinstance(val, datetime):
+            self._mtime = val
+        elif isinstance(val, six.string_types) or isinstance(val, six.binary_type):
+            v = to_str(val)
+            pat_older = '%b %d %Y'
+            pat_newer = '%b %d %H:%M'
+            cur_year = datetime.utcnow().year
+            try:
+                self._mtime = datetime.strptime(v, pat_older)
+            except ValueError:
+                try:
+                    mt = datetime.strptime(v, pat_newer)
+                    self._mtime = datetime(cur_year, mt.month, mt.day, mt.hour, mt.minute)
+                except ValueError:
+                    msg = "Invalid mtime of the FTP entry %r." % (val)
+                    raise ValueError(msg)
+        else:
+            msg = "Invalid mtime of the FTP entry %r." % (val)
+            raise ValueError(msg)
+
+    # -------------------------------------------------------------------------
+    def as_dict(self, short=False):
+        """
+        Transforms the elements of the object into a dict
+
+        @param short: don't include local properties in resulting dict.
+        @type short: bool
+
+        @return: structure as dict
+        @rtype:  dict
+        """
+
+        res = super(DirEntry, self).as_dict(short=short)
+        res['name'] = self.name
+        res['perms'] = self.perms.oct()
+        res['num_hardlinks'] = self.num_hardlinks
+        res['user'] = self.user
+        res['group'] = self.group
+        res['size'] = self.size
+        res['mtime'] = self.mtime
+
+        return res
+
+    # -------------------------------------------------------------------------
+    def __repr__(self):
+        """Typecasting into a string for reproduction."""
+
+        out = "<%s(" % (self.__class__.__name__)
+
+        fields = []
+        fields.append("perms=%r" % (self.perms.oct()))
+        fields.append("num_hardlinks=%r" % (self.num_hardlinks))
+        fields.append("user=%r" % (self.user))
+        fields.append("group=%r" % (self.group))
+        fields.append("size=%r" % (self.size))
+        fields.append("mtime=%r" % (self.mtime))
+        fields.append("name=%r" % (self.name))
+        fields.append("appname=%r" % (self.appname))
+        fields.append("verbose=%r" % (self.verbose))
+        fields.append("initialized=%r" % (self.initialized))
+
+        out += ", ".join(fields) + ")>"
+        return out
+
+    # -------------------------------------------------------------------------
+    def __str__(self):
+
+        tpl = '%(perm)s %(hl)3d %(user)-8s %(group)-8s %(size)12d '
+        tpl += '%(mtime)s %(name)s'
+        out = {
+            'perm': str(self.perms),
+            'hl': 0,
+            'user': 'None',
+            'group': 'None',
+            'size': 0,
+            'mtime': 'None',
+            'name': 'None',
+        }
+        if self.name is not None:
+            out['name'] = self.name
+        if self.num_hardlinks is not None:
+            out['hl'] = self.num_hardlinks
+        if self.user is not None:
+            out['user'] = self.user
+        if self.group is not None:
+            out['group'] = self.group
+        if self.size is not None:
+            out['size'] = self.size
+        if self.mtime is not None:
+            out['mtime'] = self.mtime.strftime('%Y-%m-%d %H:%M')
+
+        return tpl % out
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def from_dir_line(cls, line, appname=None, verbose=0):
+
+        line = line.strip()
+        match = cls.re_dir_line.search(line)
+        if not match:
+            LOG.warn("Invalid line in FTP dir output %r.", line)
+            return None
+
+        dir_entry = cls(appname=appname, verbose=verbose)
+
+        dir_entry.perms = match.group(1)
+        dir_entry.num_hardlinks = match.group(2)
+        dir_entry.user = match.group(3)
+        dir_entry.group = match.group(4)
+        dir_entry.size = match.group(5)
+        dir_entry.mtime = match.group(6)
+        dir_entry.name = match.group(7)
+        dir_entry.initialized = True
+
+        if verbose > 3:
+            LOG.debug('Initialized FTP dir entry:\n%s', pp(dir_entry.as_dict(short=True)))
+
+        return dir_entry
+
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

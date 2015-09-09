@@ -28,6 +28,8 @@ from pb_base.cfg_app import PbCfgApp
 
 import ftp_backup
 
+from ftp_backup.ftp_dir import DirEntry
+
 __version__ = '0.2.0'
 
 LOG = logging.getLogger(__name__)
@@ -314,6 +316,8 @@ class BackupByFtpApp(PbCfgApp):
 
         cur_backup_dirs = []
 
+        dlist = self.dir_list()
+
         dirs = self.ftp.nlst()
         for entry in dirs:
             if self.verbose > 3:
@@ -448,6 +452,30 @@ class BackupByFtpApp(PbCfgApp):
             #dir_entries = self.ftp.dir(item)
             #if self.verbose:
             #    LOG.debug("Directory entries to remove:\n%s", pp(dir_entries))
+
+    # -------------------------------------------------------------------------
+    def dir_list(self, item=None):
+
+        dlist = []
+
+        def perform_dir_output(line):
+            if self.verbose > 2:
+                LOG.debug("Performing line %r ...", line)
+
+            line = line.strip()
+            if not line:
+                return
+            entry = DirEntry.from_dir_line(
+                line, appname=self.appname, verbose=self.verbose)
+            if entry:
+                dlist.append(entry)
+
+        if item:
+            self.ftp.dir(item, perform_dir_output)
+        else:
+            self.ftp.dir(perform_dir_output)
+
+        return dlist
 
     # -------------------------------------------------------------------------
     def post_run(self):
