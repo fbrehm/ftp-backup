@@ -15,12 +15,13 @@ import os
 import ftplib
 import ssl
 import re
+import glob
 from datetime import datetime
 
 # Third party modules
 
 # Own modules
-from pb_base.common import to_bool, pp
+from pb_base.common import to_bool, pp, bytes2human
 from pb_base.app import PbApplicationError
 
 from pb_base.cfg_app import PbCfgAppError
@@ -30,7 +31,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.2.2'
+__version__ = '0.3.0'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -403,8 +404,46 @@ class BackupByFtpApp(PbCfgApp):
                 dirs_delete.append(backup_dir)
         LOG.debug("Directories to remove:\n%s", pp(dirs_delete))
 
+        # Removing recursive unnecessary stuff
         for item in dirs_delete:
             self.remove_recursive(item)
+
+        # Creating date formatted directory
+        LOG.info("Creating directory %r ...", new_backup_dir)
+        if not self.simulate:
+            self.ftp.mkd(new_backup_dir)
+
+        try:
+            LOG.debug("Changing into %r ...", new_backup_dir)
+            if not self.simulate:
+                self.ftp.cwd(new_backup_dir)
+
+            # Backing up stuff
+            LOG.debug("Searching for stuff to backup.")
+            local_files = glob.glob('*')
+            for local_file in local_files:
+
+                if not os.path.isfile(local_file):
+                    if self.verbose > 1:
+                        LOG.debug("%r is ot a file, don't backup it.", local_file)
+                    continue
+
+                statinfo = os.stat(local_file)
+                size = statinfo.st_size
+                s = ''
+                if size != 1:
+                    s = 's'
+                size_human = bytes2human(size, precision=1)
+                LOG.info("Transfering file %r, size %d Byte%s (%s).",
+                    local_file, size, s, size_human)
+                if not self.simulate:
+                    cmd = 'STOR %s' % (local_file)
+                    with open(local_file, 'rb') as f:
+                        self.ftp.storbinary(cmd, f)
+        finally:
+            LOG.debug("Changing cwd up.")
+            if not self.simulate:
+                self.ftp.cwd('..')
 
     # -------------------------------------------------------------------------
     def map_dirs2types(self, type_mapping, backup_dirs):
