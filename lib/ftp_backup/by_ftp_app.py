@@ -31,7 +31,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -317,7 +317,12 @@ class BackupByFtpApp(PbCfgApp):
     def _run(self):
         """The underlaying startpoint of the application."""
 
+        if not os.path.isdir(self.local_directory):
+            LOG.error("Local directory %r does not exists.", self.local_directory)
+            sys.exit(5)
+
         re_backup_dirs = re.compile(r'^\s*\d{4}[-_]+\d\d[-_]+\d\d[-_]+\d+\s*$')
+        re_whitespace = re.compile(r'\s+')
 
         self.login_ftp()
 
@@ -352,6 +357,7 @@ class BackupByFtpApp(PbCfgApp):
             new_backup_dir = backup_dir_tpl % (i)
             if not new_backup_dir in cur_backup_dirs:
                 found = True
+            i += 1
         LOG.info("New backup directory: %r", new_backup_dir)
         cur_backup_dirs.append(new_backup_dir)
 
@@ -413,19 +419,21 @@ class BackupByFtpApp(PbCfgApp):
         if not self.simulate:
             self.ftp.mkd(new_backup_dir)
 
+        local_pattern = os.path.join(self.local_directory, '*')
+
         try:
             LOG.debug("Changing into %r ...", new_backup_dir)
             if not self.simulate:
                 self.ftp.cwd(new_backup_dir)
 
             # Backing up stuff
-            LOG.debug("Searching for stuff to backup.")
-            local_files = glob.glob('*')
+            LOG.debug("Searching for stuff to backup in %r.", local_pattern)
+            local_files = glob.glob(local_pattern)
             for local_file in local_files:
 
                 if not os.path.isfile(local_file):
                     if self.verbose > 1:
-                        LOG.debug("%r is ot a file, don't backup it.", local_file)
+                        LOG.debug("%r is not a file, don't backup it.", local_file)
                     continue
 
                 statinfo = os.stat(local_file)
@@ -434,10 +442,11 @@ class BackupByFtpApp(PbCfgApp):
                 if size != 1:
                     s = 's'
                 size_human = bytes2human(size, precision=1)
-                LOG.info("Transfering file %r, size %d Byte%s (%s).",
-                    local_file, size, s, size_human)
+                remote_file = re_whitespace.sub('_', os.path.basename(local_file))
+                LOG.info("Transfering file %r -> %r, size %d Byte%s (%s).",
+                    local_file, remote_file, size, s, size_human)
                 if not self.simulate:
-                    cmd = 'STOR %s' % (local_file)
+                    cmd = 'STOR %s' % (remote_file)
                     with open(local_file, 'rb') as f:
                         self.ftp.storbinary(cmd, f)
         finally:
