@@ -24,7 +24,7 @@ from pb_base.common import to_str_or_bust as to_str
 from pb_base.object import PbBaseObjectError
 from pb_base.object import PbBaseObject
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -509,6 +509,17 @@ class DirEntry(PbBaseObject):
             LOG.debug('Initialized FTP dir entry:\n%s', pp(dir_entry.as_dict(short=True)))
 
         return dir_entry
+
+    # -------------------------------------------------------------------------
+    def __cmp__(self, other):
+        """Helper method, which is used by sorted()."""
+
+        if not isinstance(other, DirEntry):
+            msg = "Trying to compare apples (%s) with pears (%s)." % (
+                self.__class__.__name__, other.__class__.__name__)
+            raise TypeError(msg)
+
+        return cmp(self.name.lower(), self.other.lower())
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
