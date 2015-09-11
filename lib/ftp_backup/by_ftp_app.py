@@ -30,7 +30,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -73,6 +73,8 @@ class BackupByFtpApp(PbCfgApp):
         self.ftp_tz = DEFAULT_FTP_TZ
         self.ftp_tls = False
         self.ftp_timeout = DEFAULT_FTP_TIMEOUT
+
+        self.simulate = False
 
         self.connected = False
         self.logged_in = False
@@ -119,6 +121,9 @@ class BackupByFtpApp(PbCfgApp):
         h = "Local directory for the files to backup (default: %r)." % (DEFAULT_LOCAL_DIRECTORY)
         self.arg_parser.add_argument('-D', '--dir', '--local-dir', metavar='DIR',
             dest='local_dir', help = h)
+
+        h = "Simulation mode, no modifying actions are done."
+        self.arg_parser.add_argument('-t', '--test', action='store_true', help=h)
 
         ftp_group = self.arg_parser.add_argument_group('FTP parameters')
 
@@ -185,6 +190,9 @@ class BackupByFtpApp(PbCfgApp):
             self.ftp_remote_dir = self.args.remote_dir
         if self.args.tz:
             self.ftp_tz = self.args.tz
+
+        if self.args.test:
+            self.simulate = True
 
         if self.args.copies_yearly and self.args.copies_yearly > 0:
             self.copies['yearly'] = self.args.copies_yearly
