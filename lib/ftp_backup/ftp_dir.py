@@ -24,7 +24,7 @@ from pb_base.common import to_str_or_bust as to_str
 from pb_base.object import PbBaseObjectError
 from pb_base.object import PbBaseObject
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 LOG = logging.getLogger(__name__)
 
@@ -520,6 +520,14 @@ class DirEntry(PbBaseObject):
             raise TypeError(msg)
 
         return cmp(self.name.lower(), self.other.lower())
+
+    # -------------------------------------------------------------------------
+    def is_dir(self):
+        return self.perms.is_dir()
+
+    # -------------------------------------------------------------------------
+    def is_file(self):
+        return self.perms.is_file()
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

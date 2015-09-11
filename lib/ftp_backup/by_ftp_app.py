@@ -30,7 +30,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -326,14 +326,14 @@ class BackupByFtpApp(PbCfgApp):
 
         dlist = self.dir_list()
 
-        dirs = self.ftp.nlst()
-        for entry in dirs:
+        #dirs = self.ftp.nlst()
+        for entry in dlist:
             if self.verbose > 3:
-                LOG.debug("Entry in FTP dir:\n%s", pp(entry))
-            if re_backup_dirs.search(entry):
-                cur_backup_dirs.append(entry)
+                LOG.debug("Entry in FTP dir:\n%s", pp(entry.as_dict(short=True)))
+            if re_backup_dirs.search(entry.name):
+                cur_backup_dirs.append(entry.name)
             else:
-                LOG.debug("FTP-Entry %r is not a valid backup directory.", entry)
+                LOG.debug("FTP-Entry %r is not a valid backup directory.", entry.name)
         cur_backup_dirs.sort(key=str.lower)
         if self.verbose > 1:
             LOG.debug("Found backup directories:\n%s", pp(cur_backup_dirs))
@@ -456,10 +456,34 @@ class BackupByFtpApp(PbCfgApp):
             return
 
         for item in items:
-            LOG.info("Removing %r ...", item)
-            #dir_entries = self.ftp.dir(item)
-            #if self.verbose:
-            #    LOG.debug("Directory entries to remove:\n%s", pp(dir_entries))
+            LOG.info("Removing recursive %r ...", item)
+
+            try:
+                LOG.debug("Trying to change into directory %r ...", item)
+                self.ftp.cwd(item)
+                LOG.debug("Cwd successful.")
+                dlist = self.dir_list()
+                for entry in dlist:
+                    if entry.name == '.' or entry.name == '..':
+                        continue
+                    if entry.is_dir():
+                        self.remove_recursive(entry.name)
+                    else:
+                        LOG.info("Removing %r ...", entry.name)
+                        if not self.simulate:
+                            self.ftp.delete(entry.name)
+                LOG.debug("Changing cwd up.")
+                self.ftp.cwd('..')
+                LOG.info("Removing %r ...", item)
+                if not self.simulate:
+                    self.ftp.rmd(item)
+            except ftplib.error_perm:
+                LOG.info("Object %r was not a directory, removing it.", item)
+                if not self.simulate:
+                    self.ftp.delete(item)
+            except Exception as e:
+                msg = "Cwd to %r not successful: %s" % (item, str(e))
+                self.handle_error(msg, e.__class__.__name__, True)
 
     # -------------------------------------------------------------------------
     def dir_list(self, item=None):
