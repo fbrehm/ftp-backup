@@ -9,6 +9,7 @@
 """
 
 # Standard modules
+import sys
 import logging
 import textwrap
 import os
@@ -21,6 +22,8 @@ from datetime import datetime
 # Third party modules
 
 # Own modules
+from pb_logging.colored import ColoredFormatter
+
 from pb_base.common import to_bool, pp, bytes2human
 from pb_base.app import PbApplicationError
 
@@ -31,7 +34,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -282,6 +285,47 @@ class BackupByFtpApp(PbCfgApp):
                         self.copies['daily'] = v
 
     # -------------------------------------------------------------------------
+    def init_logging(self):
+        """
+        Initialize the logger object.
+        It creates a colored loghandler with all output to STDERR.
+        Maybe overridden in descendant classes.
+
+        @return: None
+        """
+
+        root_log = logging.getLogger()
+        root_log.setLevel(logging.INFO)
+        if self.verbose:
+            root_log.setLevel(logging.DEBUG)
+
+        # create formatter
+        format_str = '[%(asctime)s]: ' + self.appname + ': '
+        if self.verbose:
+            if self.verbose > 1:
+                format_str += '%(name)s(%(lineno)d) %(funcName)s() '
+            else:
+                format_str += '%(name)s '
+        format_str += '%(levelname)s - %(message)s'
+        formatter = None
+        if self.terminal_has_colors:
+            formatter = ColoredFormatter(format_str)
+        else:
+            formatter = logging.Formatter(format_str)
+
+        # create log handler for console output
+        lh_console = logging.StreamHandler(sys.stderr)
+        if self.verbose:
+            lh_console.setLevel(logging.DEBUG)
+        else:
+            lh_console.setLevel(logging.INFO)
+        lh_console.setFormatter(formatter)
+
+        root_log.addHandler(lh_console)
+
+        return
+
+    # -------------------------------------------------------------------------
     def init_ftp(self):
 
         LOG.debug("Initializing FTP object ...")
@@ -429,7 +473,7 @@ class BackupByFtpApp(PbCfgApp):
             # Backing up stuff
             LOG.debug("Searching for stuff to backup in %r.", local_pattern)
             local_files = glob.glob(local_pattern)
-            for local_file in local_files:
+            for local_file in sorted(local_files, key=str.lower):
 
                 if not os.path.isfile(local_file):
                     if self.verbose > 1:
