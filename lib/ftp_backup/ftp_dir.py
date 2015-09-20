@@ -24,7 +24,7 @@ from pb_base.common import to_str_or_bust as to_str
 from pb_base.object import PbBaseObjectError
 from pb_base.object import PbBaseObject
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 LOG = logging.getLogger(__name__)
 
@@ -97,25 +97,25 @@ class EntryPermissions(object):
         match = cls.re_from_str.search(v)
         if match:
             if match.group(1) != '-':
-                perm | STAT_ISDIR
+                perm |= STAT_ISDIR
             if match.group(2) != '-':
-                perm | STAT_RUSR
+                perm |= STAT_RUSR
             if match.group(3) != '-':
-                perm | STAT_WUSR
+                perm |= STAT_WUSR
             if match.group(4) != '-':
-                perm | STAT_XUSR
+                perm |= STAT_XUSR
             if match.group(5) != '-':
-                perm | STAT_RGRP
+                perm |= STAT_RGRP
             if match.group(6) != '-':
-                perm | STAT_WGRP
+                perm |= STAT_WGRP
             if match.group(7) != '-':
-                perm | STAT_XGRP
+                perm |= STAT_XGRP
             if match.group(8) != '-':
-                perm | STAT_ROTH
+                perm |= STAT_ROTH
             if match.group(9) != '-':
-                perm | STAT_WOTH
+                perm |= STAT_WOTH
             if match.group(10) != '-':
-                perm | STAT_XOTH
+                perm |= STAT_XOTH
             return perm
 
         match = cls.re_dec.search(v)
@@ -278,6 +278,8 @@ class DirEntry(PbBaseObject):
         self._user = None
         self._group = None
         self._size = 0
+        if six.PY2:
+            self._size = long(0)
         self._mtime = None
 
         super(DirEntry, self).__init__(
@@ -378,7 +380,10 @@ class DirEntry(PbBaseObject):
 
     @size.setter
     def size(self, val):
-        v = int(val)
+        if six.PY2:
+            v = long(val)
+        else:
+            v = int(val)
         if v < 0:
             msg = "Invalid size of the FTP entry %r." % (val)
             raise ValueError(msg)
@@ -424,7 +429,9 @@ class DirEntry(PbBaseObject):
         """
 
         res = super(DirEntry, self).as_dict(short=short)
+        res['is_dir'] = self.is_dir()
         res['name'] = self.name
+        res['permissions'] = str(self.perms)
         res['perms'] = self.perms.oct()
         res['num_hardlinks'] = self.num_hardlinks
         res['user'] = self.user
