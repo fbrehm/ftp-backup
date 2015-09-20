@@ -20,12 +20,15 @@ import glob
 from datetime import datetime
 
 # Third party modules
+import six
 
 # Own modules
 from pb_logging.colored import ColoredFormatter
 
 from pb_base.common import to_bool, pp, bytes2human
 from pb_base.app import PbApplicationError
+
+from pb_base.handler import PbBaseHandlerError
 
 from pb_base.cfg_app import PbCfgAppError
 from pb_base.cfg_app import PbCfgApp
@@ -34,7 +37,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.3.2'
+__version__ = '0.4.0'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -52,6 +55,11 @@ DEFAULT_COPIES_YEARLY = 2
 DEFAULT_COPIES_MONTHLY = 2
 DEFAULT_COPIES_WEEKLY = 2
 DEFAULT_COPIES_DAILY = 2
+
+
+# =============================================================================
+class FTPHandlerError(PbBaseHandlerError):
+    pass
 
 
 # =============================================================================
@@ -376,7 +384,6 @@ class BackupByFtpApp(PbCfgApp):
 
         dlist = self.dir_list()
 
-        #dirs = self.ftp.nlst()
         for entry in dlist:
             if self.verbose > 3:
                 LOG.debug("Entry in FTP dir:\n%s", pp(entry.as_dict(short=True)))
@@ -493,10 +500,49 @@ class BackupByFtpApp(PbCfgApp):
                     cmd = 'STOR %s' % (remote_file)
                     with open(local_file, 'rb') as f:
                         self.ftp.storbinary(cmd, f)
+
         finally:
             LOG.debug("Changing cwd up.")
             if not self.simulate:
                 self.ftp.cwd('..')
+
+        # Detect and display current disk usages
+        total_bytes = 0
+        if six.PY2:
+            total_bytes = long(0)
+
+        dlist = self.dir_list()
+        total_s = 'Total'
+        max_len = len(total_s)
+
+        for entry in dlist:
+            if len(entry.name) > max_len:
+                max_len = len(entry.name)
+        max_len += 2
+
+        LOG.info("Current disk usages:")
+        for entry in dlist:
+
+            if entry.name == '.' or entry.name == '..':
+                continue
+
+            entry_size = self.disk_usage(entry)
+            total_bytes += entry_size
+            s = ''
+            if entry_size != 1:
+                s = 's'
+            b_h = bytes2human(entry_size, precision=1)
+            (val, unit) = b_h.split(maxsplit=1)
+            b_h_s = "%6s %s" % (val, unit)
+            LOG.info("%-*r %13d Byte%s (%s)", max_len, entry.name, entry_size, s, b_h_s)
+
+        s = ''
+        if total_bytes != 1:
+            s = 's'
+        b_h = bytes2human(total_bytes, precision=1)
+        (val, unit) = b_h.split(maxsplit=1)
+        b_h_s = "%6s %s" % (val, unit)
+        LOG.info("%-*s %13d Byte%s (%s)", max_len, total_s + ':', total_bytes, s, b_h_s)
 
     # -------------------------------------------------------------------------
     def map_dirs2types(self, type_mapping, backup_dirs):
@@ -578,7 +624,7 @@ class BackupByFtpApp(PbCfgApp):
                 self.handle_error(msg, e.__class__.__name__, True)
 
     # -------------------------------------------------------------------------
-    def dir_list(self, item=None):
+    def dir_list(self, item_name=None):
 
         dlist = []
 
@@ -594,12 +640,54 @@ class BackupByFtpApp(PbCfgApp):
             if entry:
                 dlist.append(entry)
 
-        if item:
-            self.ftp.dir(item, perform_dir_output)
+        if item_name:
+            self.ftp.dir(item_name, perform_dir_output)
         else:
             self.ftp.dir(perform_dir_output)
 
         return dlist
+
+    # -------------------------------------------------------------------------
+    def disk_usage(self, item):
+        """
+        Performs a recursive determination of the disk usage of
+        the given FTP directory item.
+        This item must be located in the current remote directory.
+        """
+
+        if not self.logged_in:
+            msg = "Could not detect disk usage of item %r, not loggen in."
+            raise FTPHandlerError(msg)
+
+        total = 0
+        if six.PY2:
+            total = long(0)
+
+        if not item:
+            msg = "No item to detect disk usage given."
+            raise FTPHandlerError(msg)
+
+        if self.verbose > 3:
+            LOG.debug("Analyzing item:\n%s", pp(item.as_dict(short=True)))
+
+        if not item.is_dir():
+            return item.size
+
+        if self.verbose > 2:
+            msg = "Trying to detect disk usage of remote directory %r ..."
+            LOG.debug(msg, item.name)
+
+        item_dir_list = self.dir_list(item.name)
+        for list_item in item_dir_list:
+            if list_item.name == '.' or list_item.name == '..':
+                continue
+            list_item.name = item.name + '/' + list_item.name
+            list_item_size = self.disk_usage(list_item)
+            if self.verbose > 2:
+                LOG.debug("Got disk usage of %r: %d Bytes.", list_item.name, list_item_size)
+            total += list_item_size
+
+        return total
 
     # -------------------------------------------------------------------------
     def post_run(self):
