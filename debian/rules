@@ -38,10 +38,12 @@ override_dh_auto_build:
 override_dh_auto_install:
 	@echo ""
 	@echo "Installing Python 2 stuff ..."
-	set -e && for pyvers in $(PYTHON2S); do python$$pyvers setup.py install_lib --root=$(INSTALL_DIR_LIB2) --install-layout=deb; done
+	set -e && for pyvers in $(PYTHON2S); do python$$pyvers setup.py install --root=$(INSTALL_DIR_LIB2) --install-layout=deb; done
+	rm -r $(INSTALL_DIR_LIB2)/usr/bin
 	@echo ""
 	@echo "Installing Python 3 stuff ..."
-	set -e && for pyvers in $(PYTHON3S); do python$$pyvers setup.py install_lib --root=$(INSTALL_DIR_LIB3) --install-layout=deb; done
+	set -e && for pyvers in $(PYTHON3S); do python$$pyvers setup.py install --root=$(INSTALL_DIR_LIB3) --install-layout=deb; done
+	rm -r $(INSTALL_DIR_LIB3)/usr/bin
 	@echo ""
 	@echo "Installing bin package ..."
 	install -d $(INSTALL_DIR_BIN)/usr/bin

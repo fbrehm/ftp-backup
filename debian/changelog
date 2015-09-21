@@ -1,0 +1,6 @@
+ftp-backup (0.3.0) wheezy jessie stretch trusty vivid wily; urgency=medium
+
+  * Initial create of a Debian package
+  * Add Debian build infrastructure
+
+ -- Frank Brehm <frank.brehm@profitbricks.com>  Mon, 21 Sep 2015 23:38:25 +0200
