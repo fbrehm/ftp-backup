@@ -1,0 +1,7 @@
+*.debhelper
+*.log
+*.substvars
+files
+ftp-backup
+python-ftp-backup
+python3-ftp-backup

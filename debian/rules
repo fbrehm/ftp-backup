@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+BIN_PKGNAME  := ftp-backup
+LIB2_PKGNAME := python-ftp-backup
+LIB3_PKGNAME := python3-ftp-backup
+
+INSTALL_DIR_BIN  := $(CURDIR)/debian/$(BIN_PKGNAME)
+INSTALL_DIR_LIB2 := $(CURDIR)/debian/$(LIB2_PKGNAME)
+INSTALL_DIR_LIB3 := $(CURDIR)/debian/$(LIB3_PKGNAME)
+
+PYTHON2S := $(shell pyversions -vr || true)
+PYTHON3S := $(shell py3versions -vr || true)
+
+%:
+	dh $@ --with python2,python3
+
+override_dh_auto_clean:
+	@echo
+	@echo "-------------------------------------------"
+	@echo "Cleaning ..."
+	@echo
+	dh_auto_clean
+	rm -rf dist
+#	rm -fv man/*
+#	rm -fv tmp/*
+
+override_dh_auto_build:
+	@echo ""
+	@echo "Building Python 2 stuff ..."
+	set -e && for pyvers in $(PYTHON2S); do python$$pyvers setup.py build; done
+	@echo ""
+	@echo "Building Python 3 stuff ..."
+	set -e && for pyvers in $(PYTHON3S); do python$$pyvers setup.py build; done
+#	@echo ""
+#	./generate-manpages.sh
+
+override_dh_auto_install:
+	@echo ""
+	@echo "Installing Python 2 stuff ..."
+	set -e && for pyvers in $(PYTHON2S); do python$$pyvers setup.py install_lib --root=$(INSTALL_DIR_LIB2) --install-layout=deb; done
+	@echo ""
+	@echo "Installing Python 3 stuff ..."
+	set -e && for pyvers in $(PYTHON3S); do python$$pyvers setup.py install_lib --root=$(INSTALL_DIR_LIB3) --install-layout=deb; done
+	@echo ""
+	@echo "Installing bin package ..."
+	install -d $(INSTALL_DIR_BIN)/usr/bin
+	install -m 0755 bin/backup-per-ftp $(INSTALL_DIR_BIN)/usr/bin/backup-per-ftp
+#	@echo ""
+#	@echo "Manpages ..."
+#	dh_installman
+
