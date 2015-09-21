@@ -4,7 +4,10 @@
 *.egg
 *-stamp
 *.bak
+*.egg-info
 build
+dist
 trace
 MANIFEST
+/lib/ftp_backup/local_version.py
 .idea
