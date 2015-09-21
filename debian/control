@@ -1,0 +1,55 @@
+Source: ftp-backup
+Section: python
+Priority: extra
+Maintainer: Frank Brehm <frank@brehm-online.com>
+Build-Depends: debhelper (>= 9),
+               help2man,
+               python-all,
+               python-argparse,
+               python-pb-base,
+               python-setuptools,
+               python-six,
+               python3-all,
+               python3-pb-base,
+               python3-setuptools,
+               python3-six
+Standards-Version: 3.9.6
+Homepage: https://github.com/fbrehm/ftp-backup
+Vcs-Browser: https://github.com/fbrehm/ftp-backup
+Vcs-Git: https://github.com/fbrehm/ftp-backup.git
+X-Python-Version: >= 2.6
+X-Python3-Version: >= 3.2
+
+Package: ftp-backup
+Architecture: all
+Pre-Depends: ${misc:Pre-Depends}
+Depends: python-ftp-backup (= ${binary:Version}),
+         ${misc:Depends},
+         ${python:Depends}
+Description: Perform a selective backup to a FTP server.
+ .
+ This package includes the executable binaries.
+
+Package: python-ftp-backup
+Architecture: all
+Depends: python-argparse,
+         python-pb-base,
+         python-pb-logging,
+         python-six,
+         ${misc:Depends},
+         ${python:Depends}
+Description: Perform a selective backup to a FTP server.
+ .
+ This package includes the Python2 modules for this package.
+
+Package: python3-ftp-backup
+Architecture: all
+Depends: python3-pb-logging,
+         python3-pb-base,
+         python3-six,
+         ${misc:Depends},
+         ${python3:Depends}
+Description: Perform a selective backup to a FTP server.
+ .
+ This package includes the Python3 modules for this package.
+
