@@ -54,7 +54,7 @@ def read(fname):
     content = None
     print("Reading %r ..." % (fname))
     if sys.version_info[0] > 2:
-        with open(fname, 'r', encoding = 'utf-8') as fh:
+        with open(fname, 'r', encoding='utf-8') as fh:
             content = fh.read()
     else:
         with open(fname, 'r') as fh:
@@ -170,7 +170,7 @@ setup(
     license=__license__,
     platforms=['posix'],
     package_dir={'': 'lib'},
-    packages=['ftp_backup',],
+    packages=['ftp_backup', ],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
