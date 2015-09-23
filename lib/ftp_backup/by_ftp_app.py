@@ -35,7 +35,7 @@ import ftp_backup
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -53,6 +53,13 @@ DEFAULT_COPIES_YEARLY = 2
 DEFAULT_COPIES_MONTHLY = 2
 DEFAULT_COPIES_WEEKLY = 2
 DEFAULT_COPIES_DAILY = 2
+
+APP_VERSION = ftp_backup.__version__
+try:
+    import ftp_backup.local_version
+    APP_VERSION = ftp_backup.local_version.__version__
+except ImportError:
+    pass
 
 
 # =============================================================================
@@ -103,7 +110,7 @@ class BackupByFtpApp(PbCfgApp):
         super(BackupByFtpApp, self).__init__(
             appname=appname,
             verbose=verbose,
-            version=ftp_backup.__version__,
+            version=APP_VERSION,
             description=textwrap.dedent(description),
             cfg_dir='ftp-backup',
             hide_default_config=True,
