@@ -1,3 +1,9 @@
+ftp-backup (0.3.1) UNRELEASED; urgency=medium
+
+  * Apllied flake8 rules to all python sources
+
+ -- Frank Brehm <frank.brehm@profitbricks.com>  Wed, 23 Sep 2015 12:56:42 +0200
+
 ftp-backup (0.3.0) wheezy jessie stretch trusty vivid wily; urgency=medium
 
   * Initial create of a Debian package
