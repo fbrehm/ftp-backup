@@ -18,13 +18,12 @@ import six
 
 # Own modules
 
-from pb_base.common import to_bool, pp
+from pb_base.common import pp
 from pb_base.common import to_str_or_bust as to_str
 
-from pb_base.object import PbBaseObjectError
 from pb_base.object import PbBaseObject
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 LOG = logging.getLogger(__name__)
 
@@ -47,6 +46,7 @@ STAT_XOTH = 0o400
 
 # Is a directory
 STAT_ISDIR = 0o1000
+
 
 # =============================================================================
 class EntryPermissions(object):
@@ -88,6 +88,7 @@ class EntryPermissions(object):
             raise ValueError(msg)
 
         self._permission &= 0o1777
+
     # -------------------------------------------------------------------------
     @classmethod
     def to_int(cls, permission):
@@ -122,12 +123,12 @@ class EntryPermissions(object):
         if match:
             perm = int(match.group(1))
             return perm
-        
+
         match = cls.re_oct.search(v)
         if match:
             perm = int(match.group(1), 8)
             return perm
-        
+
         match = cls.re_hex.search(v)
         if match:
             perm = int(match.group(1), 16)
@@ -272,7 +273,7 @@ class DirEntry(PbBaseObject):
         self, name=None, perms=None, num_hardlinks=None, user=None, group=None,
             size=None, mtime=None, appname=None, verbose=0, initialized=False):
 
-        self._name = None 
+        self._name = None
         self._perms = EntryPermissions(0)
         self._num_hardlinks = None
         self._user = None
