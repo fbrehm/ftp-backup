@@ -17,6 +17,7 @@ import ftplib
 import ssl
 import re
 import glob
+import time
 from datetime import datetime
 
 # Third party modules
@@ -499,7 +500,21 @@ class BackupByFtpApp(PbCfgApp):
                 if not self.simulate:
                     cmd = 'STOR %s' % (remote_file)
                     with open(local_file, 'rb') as f:
-                        self.ftp.storbinary(cmd, f)
+                        try_nr = 0
+                        while try_nr < 10:
+                            try_nr += 1
+                            if try_nr > 2:
+                                LOG.info("Try %d transferring file %r ...", try_nr, local_file)
+                            try:
+                                self.ftp.storbinary(cmd, f)
+                                break
+                            except ftplib.error_temp as e:
+                                if try_nr >= 10:
+                                    msg = "Giving up trying to upload %r after %d tries: %s"
+                                    LOG.error(msg, local_file, try_nr, str(e))
+                                    raise
+                                self.handle_error(str(e), e.__class__.__name__, False)
+                                time.sleep(2)
 
         finally:
             LOG.debug("Changing cwd up.")
