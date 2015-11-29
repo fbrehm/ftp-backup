@@ -26,7 +26,7 @@ from pb_base.common import to_bool, pp, bytes2human
 from pb_base.handler import PbBaseHandlerError
 from pb_base.handler import PbBaseHandler
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -176,6 +176,18 @@ class FTPHandler(PbBaseHandler):
 
     # -----------------------------------------------------------
     @property
+    def connected(self):
+        """Flag showing, that a connection is established to a FTP server."""
+        return self._connected
+
+    # -----------------------------------------------------------
+    @property
+    def logged_in(self):
+        """Flag showing, that the client waslogged in on the FTP server."""
+        return self._logged_in
+
+    # -----------------------------------------------------------
+    @property
     def passive(self):
         """Use passive mode for data transfer."""
         return self._passive
@@ -192,6 +204,10 @@ class FTPHandler(PbBaseHandler):
 
     @tls.setter
     def tls(self, value):
+        val = bool(value)
+        if self.connected and val != self._tls:
+            msg = "Changing the property 'tls' not possible, currently connected."
+            raise FTPHandlerError(msg)
         self._tls = bool(value)
 
     # -----------------------------------------------------------
