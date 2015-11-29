@@ -26,7 +26,7 @@ from pb_base.common import to_bool, pp, bytes2human
 from pb_base.handler import PbBaseHandlerError
 from pb_base.handler import PbBaseHandler
 
-__version__ = '0.2.0'
+__version__ = '0.3.1'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -104,6 +104,8 @@ class FTPHandler(PbBaseHandler):
         self.port = port
         self.tls_verify = tls_verify
         self.timeout = timeout
+
+        self.init_ftp()
 
     # -----------------------------------------------------------
     @property
@@ -205,10 +207,14 @@ class FTPHandler(PbBaseHandler):
     @tls.setter
     def tls(self, value):
         val = bool(value)
-        if self.connected and val != self._tls:
-            msg = "Changing the property 'tls' not possible, currently connected."
-            raise FTPHandlerError(msg)
-        self._tls = bool(value)
+        if self.connected:
+            if val != self._tls:
+                msg = "Changing the property 'tls' not possible, currently connected."
+                raise FTPHandlerError(msg)
+            self._tls = val
+            self.init_ftp()
+        else:
+            self._tls = val
 
     # -----------------------------------------------------------
     @property
@@ -222,6 +228,14 @@ class FTPHandler(PbBaseHandler):
             msg = "Invalid value %r for parameter tls_verify." % (tls_verify)
             raise ValueError(msg)
         self._tls_verify = value
+        if self.connected:
+            if value != self._tls_verify:
+                msg = "Changing the property 'tls_verify' not possible, currently connected."
+                raise FTPHandlerError(msg)
+            self._tls_verify = value
+            self.init_ftp()
+        else:
+            self._tls_verify = value
 
     # -----------------------------------------------------------
     @property
@@ -237,6 +251,67 @@ class FTPHandler(PbBaseHandler):
                 val, MAX_FTP_TIMEOUT)
             raise ValueError(msg)
         self._timeout = val
+
+    # -------------------------------------------------------------------------
+    def as_dict(self, short=False):
+        """
+        Transforms the elements of the object into a dict
+
+        @param short: don't include local properties in resulting dict.
+        @type short: bool
+
+        @return: structure as dict
+        @rtype:  dict
+        """
+
+        res = super(FTPHandler, self).as_dict(short=short)
+        res['host'] = self.host
+        res['port'] = self.port
+        res['user'] = self.user
+        res['password'] = self.password
+        res['remote_dir'] = self.remote_dir
+        res['connected'] = self.connected
+        res['logged_in'] = self.logged_in
+        res['passive'] = self.passive
+        res['tls'] = self.tls
+        res['tls_verify'] = self.tls_verify
+        res['timeout'] = self.timeout
+
+        return res
+
+    # -------------------------------------------------------------------------
+    def init_ftp(self):
+
+        if self.tls:
+            LOG.debug("Initializing FTP_TLS object ...")
+            context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            context.verify_mode = VERIFY_OPTS[self.tls_verify]
+            self.ftp = ftplib.FTP_TLS(context=context, timeout=self.timeout)
+        else:
+            LOG.debug("Initializing FTP object ...")
+            self.ftp = ftplib.FTP(timeout=self.timeout)
+
+        if self.verbose > 1:
+            if self.verbose > 2:
+                self.ftp.set_debuglevel(2)
+            else:
+                self.ftp.set_debuglevel(1)
+
+    # -------------------------------------------------------------------------
+    def login_ftp(self):
+
+        LOG.info("Connecting to FTP server %r (port %d) ...", self.host, self.port)
+        self.ftp.connect(host=self.host, port=self.port)
+        self._connected = True
+
+        msg = self.ftp.getwelcome()
+        if msg:
+            LOG.info("Welcome message: %s", msg)
+
+        LOG.info("Logging in as %r ...", self.user)
+        self.ftp.login(user=self.user, passwd=self.password)
+        self._logged_in = True
+
 
 
 
