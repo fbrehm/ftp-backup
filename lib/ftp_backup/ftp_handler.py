@@ -35,6 +35,7 @@ DEFAULT_FTP_USER = 'anonymous'
 DEFAULT_FTP_PWD = 'frank@brehm-online.com'
 DEFAULT_FTP_TZ = 'UTC'
 DEFAULT_FTP_TIMEOUT = 60
+MAX_FTP_TIMEOUT = 3600
 
 VERIFY_OPTS = {
     None: ssl.CERT_NONE,
@@ -146,6 +147,81 @@ class FTPHandler(PbBaseHandler):
             self._user = DEFAULT_FTP_USER
             return
         self._user = str(value).strip()
+
+    # -----------------------------------------------------------
+    @property
+    def password(self):
+        """The password of the remote user on the FTP host to connect to."""
+        return self._password
+
+    @password.setter
+    def password(self, value):
+        if value is None:
+            self._password = None
+            return
+        self._password = str(value)
+
+    # -----------------------------------------------------------
+    @property
+    def remote_dir(self):
+        """The directory on the FTP host to connect to."""
+        return self._remote_dir
+
+    @remote_dir.setter
+    def remote_dir(self, value):
+        if value is None:
+            self._remote_dir = '/'
+        else:
+            self._remote_dir = str(value)
+
+    # -----------------------------------------------------------
+    @property
+    def passive(self):
+        """Use passive mode for data transfer."""
+        return self._passive
+
+    @passive.setter
+    def passive(self, value):
+        self._passive = bool(value)
+
+    # -----------------------------------------------------------
+    @property
+    def tls(self):
+        """Use a TLS encrypted session."""
+        return self._tls
+
+    @tls.setter
+    def tls(self, value):
+        self._tls = bool(value)
+
+    # -----------------------------------------------------------
+    @property
+    def tls_verify(self):
+        """Defines the behaviour in TLS mode on invalid server certificates."""
+        return self._tls_verify
+
+    @tls_verify.setter
+    def tls_verify(self, value):
+        if value not in VERIFY_OPTS.keys():
+            msg = "Invalid value %r for parameter tls_verify." % (tls_verify)
+            raise ValueError(msg)
+        self._tls_verify = value
+
+    # -----------------------------------------------------------
+    @property
+    def timeout(self):
+        """Timeout in seconds for different FTP operations."""
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        val = int(value)
+        if val < 1 or val > MAX_FTP_TIMEOUT:
+            msg = "Wrong timeout %d, must be between 1 and %d seconds." % (
+                val, MAX_FTP_TIMEOUT)
+            raise ValueError(msg)
+        self._timeout = val
+
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
