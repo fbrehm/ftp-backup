@@ -15,6 +15,7 @@ import ftplib
 import ssl
 import re
 import glob
+import time
 from datetime import datetime
 
 # Third party modules
@@ -26,7 +27,9 @@ from pb_base.common import to_bool, pp, bytes2human
 from pb_base.handler import PbBaseHandlerError
 from pb_base.handler import PbBaseHandler
 
-__version__ = '0.3.2'
+from ftp_backup.ftp_dir import DirEntry
+
+__version__ = '0.4.1'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -35,6 +38,7 @@ DEFAULT_FTP_USER = 'anonymous'
 DEFAULT_FTP_PWD = 'frank@brehm-online.com'
 DEFAULT_FTP_TZ = 'UTC'
 DEFAULT_FTP_TIMEOUT = 60
+DEFAULT_MAX_STOR_ATTEMPTS = 10
 MAX_FTP_TIMEOUT = 3600
 
 VERIFY_OPTS = {
@@ -66,7 +70,39 @@ class FTPCwdError(FTPHandlerError):
     def __str__(self):
 
         err_msg = "Error changing to remote directory %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg)
+        return err_msg % {'path': self._pathname, 'msg': self._msg}
+
+
+# =============================================================================
+class FTPRemoveError(FTPHandlerError):
+
+    # -------------------------------------------------------------------------
+    def __init__(self, pathname, msg):
+
+        self._pathname = pathname
+        self._msg = msg
+
+    # -------------------------------------------------------------------------
+    def __str__(self):
+
+        err_msg = "Error removing %(path)r: %(msg)s"
+        return err_msg % {'path': self._pathname, 'msg': self._msg}
+
+
+# =============================================================================
+class FTPPutError(FTPHandlerError):
+
+    # -------------------------------------------------------------------------
+    def __init__(self, pathname, msg):
+
+        self._pathname = pathname
+        self._msg = msg
+
+    # -------------------------------------------------------------------------
+    def __str__(self):
+
+        err_msg = "Could not transfer file %(path)r: %(msg)s"
+        return err_msg % {'path': self._pathname, 'msg': self._msg}
 
 
 # =============================================================================
@@ -80,6 +116,7 @@ class FTPHandler(PbBaseHandler):
         self, host=DEFAULT_FTP_HOST, port=DEFAULT_FTP_PORT, user=DEFAULT_FTP_USER,
             password=DEFAULT_FTP_PWD, passive=False, remote_dir=None, tls=False,
             tls_verify=None, tz=DEFAULT_FTP_TZ, timeout=DEFAULT_FTP_TIMEOUT,
+            max_stor_attempts=DEFAULT_MAX_STOR_ATTEMPTS,
             appname=None, verbose=0, version=__version__, base_dir=None,
             use_stderr=False, simulate=False, sudo=False, quiet=False,
             *targs, **kwargs):
@@ -99,6 +136,7 @@ class FTPHandler(PbBaseHandler):
         self._tls_verify = None
         self._tz = ftp_tz
         self._timeout = DEFAULT_FTP_TIMEOUT
+        self._max_stor_attempts = DEFAULT_MAX_STOR_ATTEMPTS
 
         self._connected = False
         self._logged_in = False
@@ -120,6 +158,7 @@ class FTPHandler(PbBaseHandler):
         self.port = port
         self.tls_verify = tls_verify
         self.timeout = timeout
+        self.max_stor_attempts = max_stor_attempts
 
         self.init_ftp()
 
@@ -274,6 +313,23 @@ class FTPHandler(PbBaseHandler):
             raise ValueError(msg)
         self._timeout = val
 
+    # -----------------------------------------------------------
+    @property
+    def max_stor_attempts(self):
+        """The listening port of the FTP host."""
+        return self._max_stor_attempts
+
+    @max_stor_attempts.setter
+    def max_stor_attempts(self, value):
+        if not value:
+            self._max_stor_attempts = DEFAULT_MAX_STOR_ATTEMPTS
+            return
+        p = int(value)
+        if p < 1:
+            msg = "Invalid number %r for maximoum stor attempts." % (value)
+            raise ValueError(msg)
+        self._max_stor_attempts = p
+
     # -------------------------------------------------------------------------
     def as_dict(self, short=False):
         """
@@ -298,6 +354,7 @@ class FTPHandler(PbBaseHandler):
         res['tls'] = self.tls
         res['tls_verify'] = self.tls_verify
         res['timeout'] = self.timeout
+        res['max_stor_attempts'] = self.max_stor_attempts
 
         return res
 
@@ -365,6 +422,137 @@ class FTPHandler(PbBaseHandler):
             except ftplib.error_perm as e:
                 raise FTPCwdError(pathname, str(e))
         self._remote_dir = new_dir
+
+    # -------------------------------------------------------------------------
+    def dir_list(self, item_name=None):
+
+        dlist = []
+
+        def perform_dir_output(line):
+            if self.verbose > 2:
+                LOG.debug("Performing line %r ...", line)
+
+            line = line.strip()
+            if not line:
+                return
+            entry = DirEntry.from_dir_line(
+                line, appname=self.appname, verbose=self.verbose)
+            if entry:
+                dlist.append(entry)
+
+        if item_name:
+            self.ftp.dir(item_name, perform_dir_output)
+        else:
+            self.ftp.dir(perform_dir_output)
+
+        return dlist
+
+    # -------------------------------------------------------------------------
+    def remove(self, recursive=False, *items):
+
+        if not items:
+            self.handle_error("Called remove() without items to remove.", do_traceback=True)
+            return
+
+        for item in items:
+
+            if not self.ftp or not self.logged_in:
+                msg = "Not connected or logged in."
+                raise FTPRemoveError(item, msg)
+
+            # Remove non-recursive ...
+            if not recursive:
+                LOG.info("Removing %r ...", item)
+                pathname_abs = os.path.join(self.remote_dir, item)
+                try:
+                    if not self.simulate:
+                        self.ftp.delete(item)
+                except ftplib.error_perm as e:
+                    raise FTPRemoveError(pathname_abs, str(e))
+                continue
+
+            # The recursive approach
+            LOG.info("Removing recursive %r ...", item)
+            try:
+                self.cwd(item)
+                dlist = self.dir_list()
+                for entry in dlist:
+                    if entry.name == '.' or entry.name == '..':
+                        continue
+                    if entry.is_dir():
+                        self.remove(entry.name, recursive=True)
+                    else:
+                        self.remove(entry.name)
+                self.cwd('..')
+                LOG.info("Removing directory %r ...", item)
+                if not self.simulate:
+                    self.ftp.rmd(item)
+            except ftplib.error_perm:
+                self.remove(item)
+            except Exception as e:
+                self.handle_error(str(e), e.__class__.__name__, True)
+
+    # -------------------------------------------------------------------------
+    def mkdirs(self, *dirs):
+
+        if not dirs:
+            self.handle_error("Called mkdirs() without directories to create.", do_traceback=True)
+            return
+
+        for directory in dirs:
+            self.mkdir(directory)
+
+    # -------------------------------------------------------------------------
+    def mkdir(self, directory)
+
+        if not self.ftp or not self.logged_in:
+            msg = "Cannot create %r, not connected or logged in." % (directory)
+            raise FTPHandlerError(msg)
+
+        LOG.info("Creating directory %r ...", directory)
+        if not self.simulate:
+            self.ftp.mkd(new_backup_dir)
+
+    # -------------------------------------------------------------------------
+    def put_file(self, local_file, remote_file=None):
+
+        if not self.ftp or not self.logged_in:
+            msg = "Cannot put file %r, not connected or logged in." % (local_file)
+            raise FTPHandlerError(msg)
+
+        if not remote_file:
+            remote_file = os.path.basename(local_file)
+
+        if not os.path.isfile(local_file):
+            raise FTPPutError(local_file, "not a regular file.")
+
+        statinfo = os.stat(local_file)
+        size = statinfo.st_size
+        s = ''
+        if size != 1:
+            s = 's'
+        size_human = bytes2human(size, precision=1)
+        LOG.info(
+            "Transfering file %r -> %r, size %d Byte%s (%s).",
+            local_file, remote_file, size, s, size_human)
+        if not self.simulate:
+            cmd = 'STOR %s' % (remote_file)
+            with open(local_file, 'rb') as fh:
+                try_nr = 0
+                while try_nr < self.max_stor_attempts:
+                    try_nr += 1
+                    if try_nr >= 2:
+                        LOG.info("Try %d transferring file %r ...", try_nr, local_file)
+                    try:
+                        self.ftp.storbinary(cmd, fh)
+                        break
+                    except ftplib.error_temp as e:
+                        if try_nr >= 10:
+                            msg = "Giving up trying to upload %r after %d tries: %s"
+                            LOG.error(msg, local_file, try_nr, str(e))
+                            raise
+                        self.handle_error(str(e), e.__class__.__name__, False)
+                        time.sleep(2)
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
