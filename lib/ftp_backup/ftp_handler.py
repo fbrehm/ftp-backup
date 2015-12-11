@@ -26,7 +26,7 @@ from pb_base.common import to_bool, pp, bytes2human
 from pb_base.handler import PbBaseHandlerError
 from pb_base.handler import PbBaseHandler
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -51,6 +51,22 @@ class FTPHandlerError(PbBaseHandlerError):
     in this module
     """
     pass
+
+
+# =============================================================================
+class FTPCwdError(FTPHandlerError):
+
+    # -------------------------------------------------------------------------
+    def __init__(self, pathname, msg):
+
+        self._pathname = pathname
+        self._msg = msg
+
+    # -------------------------------------------------------------------------
+    def __str__(self):
+
+        err_msg = "Error changing to remote directory %(path)r: %(msg)s"
+        return err_msg % {'path': self._pathname, 'msg': self._msg)
 
 
 # =============================================================================
@@ -198,7 +214,11 @@ class FTPHandler(PbBaseHandler):
 
     @passive.setter
     def passive(self, value):
+        old_passive = self._passive
         self._passive = bool(value)
+        if self.ftp and (old_passive != self._passive):
+            LOG.debug("Set FTP passive mode to %r.", self._passive)
+            self.ftp.set_pasv(self._passive)
 
     # -----------------------------------------------------------
     @property
@@ -307,6 +327,12 @@ class FTPHandler(PbBaseHandler):
             else:
                 self.ftp.set_debuglevel(1)
 
+        LOG.debug("Set FTP passive mode to %r.", self.passive)
+        if self.passive:
+            self.ftp.set_pasv(True)
+        else:
+            self.ftp.set_pasv(False)
+
     # -------------------------------------------------------------------------
     def login_ftp(self):
 
@@ -321,8 +347,24 @@ class FTPHandler(PbBaseHandler):
         LOG.info("Logging in as %r ...", self.user)
         self.ftp.login(user=self.user, passwd=self.password)
         self._logged_in = True
+        self.cwd(self.remote_dir)
 
+    # -------------------------------------------------------------------------
+    def cwd(self, pathname):
+        """Wrapper for ftplib.FTP.cwd()."""
 
+        new_dir = pathname
+        if not os.path.isabs(pathname):
+            new_dir = os.path.normpath(os.path.join(self.remote_dir, new_dir))
+        if self.ftp:
+            try:
+                LOG.info("Changing FTP directory to %r ...", pathname)
+                self.ftp.cwd(pathname)
+                new_dir = self.ftp.pwd()
+                LOG.debug("New FTP directory is now %r.", new_dir)
+            except ftplib.error_perm as e:
+                raise FTPCwdError(pathname, str(e))
+        self._remote_dir = new_dir
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
