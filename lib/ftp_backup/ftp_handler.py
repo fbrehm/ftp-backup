@@ -107,6 +107,8 @@ class FTPHandler(PbBaseHandler):
 
         self.init_ftp()
 
+        self.initialized = True
+
     # -----------------------------------------------------------
     @property
     def host(self):
@@ -278,6 +280,14 @@ class FTPHandler(PbBaseHandler):
         res['timeout'] = self.timeout
 
         return res
+
+    # -------------------------------------------------------------------------
+    def __del__(self):
+
+        if self.ftp and self.connected:
+            self.ftp.quit()
+
+        self.ftp = None
 
     # -------------------------------------------------------------------------
     def init_ftp(self):
