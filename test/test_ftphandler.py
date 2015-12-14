@@ -14,6 +14,13 @@ import sys
 import random
 import glob
 import logging
+import ftplib
+
+from ftplib import FTP, FTP_TLS
+
+# Own modules
+from pb_base.common import to_bool, pp, bytes2human
+from pb_base.common import to_utf8_or_bust as to_utf8
 
 try:
     import unittest2 as unittest
@@ -24,8 +31,6 @@ libdir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), '..', 'lib')
 sys.path.insert(0, libdir)
 
 from general import FtpBackupTestcase, get_arg_verbose, init_root_logger
-
-from pb_base.common import to_utf8_or_bust as to_utf8
 
 MY_APPNAME = os.path.basename(sys.argv[0]).replace('.py', '')
 LOG = logging.getLogger(MY_APPNAME)
@@ -63,6 +68,14 @@ class TestFtpHandler(FtpBackupTestcase):
         LOG.info("Testing init of a FTP handler object ...")
 
         from ftp_backup.ftp_handler import FTPHandler
+        from ftp_backup.ftp_handler import DEFAULT_FTP_HOST
+        from ftp_backup.ftp_handler import DEFAULT_FTP_PORT
+        from ftp_backup.ftp_handler import DEFAULT_FTP_USER
+        from ftp_backup.ftp_handler import DEFAULT_FTP_PWD
+        from ftp_backup.ftp_handler import DEFAULT_FTP_TZ
+        from ftp_backup.ftp_handler import DEFAULT_FTP_TIMEOUT
+        from ftp_backup.ftp_handler import DEFAULT_MAX_STOR_ATTEMPTS
+        from ftp_backup.ftp_handler import MAX_FTP_TIMEOUT
 
         ftp = FTPHandler(
             appname=self.appname,
@@ -70,10 +83,25 @@ class TestFtpHandler(FtpBackupTestcase):
         )
 
         if self.verbose > 1:
-            log.debug("repr of FTPHandler object: %r", ftp)
+            LOG.debug("repr of FTPHandler object: %r", ftp)
 
         if self.verbose > 2:
-            log.debug("FTPHandler object:\n%s", pp(ftp.as_dict(True)))
+            LOG.debug("FTPHandler object:\n%s", pp(ftp.as_dict(True)))
+
+        LOG.info("Checking FTP handler object for default values ...")
+        self.assertIsInstance(ftp.ftp, FTP)
+        self.assertEqual(ftp.connected, False)
+        self.assertEqual(ftp.host, DEFAULT_FTP_HOST)
+        self.assertEqual(ftp.logged_in, False)
+        self.assertEqual(ftp.max_stor_attempts, DEFAULT_MAX_STOR_ATTEMPTS)
+        self.assertEqual(ftp.passive, False)
+        self.assertEqual(ftp.password, DEFAULT_FTP_PWD)
+        self.assertEqual(ftp.port, DEFAULT_FTP_PORT)
+        self.assertEqual(ftp.remote_dir, '/')
+        self.assertEqual(ftp.timeout, DEFAULT_FTP_TIMEOUT)
+        self.assertEqual(ftp.tls, False)
+        self.assertEqual(ftp.tz, DEFAULT_FTP_TZ)
+        self.assertEqual(ftp.user, DEFAULT_FTP_USER)
 
 
 
