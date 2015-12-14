@@ -57,6 +57,26 @@ class TestFtpHandler(FtpBackupTestcase):
 
         import ftp_backup.ftp_handler                                   # noqa
 
+    # -------------------------------------------------------------------------
+    def test_handler_object(self):
+
+        LOG.info("Testing init of a FTP handler object ...")
+
+        from ftp_backup.ftp_handler import FTPHandler
+
+        ftp = FTPHandler(
+            appname=self.appname,
+            verbose=self.verbose,
+        )
+
+        if self.verbose > 1:
+            log.debug("repr of FTPHandler object: %r", ftp)
+
+        if self.verbose > 2:
+            log.debug("FTPHandler object:\n%s", pp(ftp.as_dict(True)))
+
+
+
 # =============================================================================
 
 if __name__ == '__main__':
@@ -72,6 +92,7 @@ if __name__ == '__main__':
 
     suite.addTest(TestFtpHandler('test_import_ftp_dir', verbose))
     suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
+    suite.addTest(TestFtpHandler('test_handler_object', verbose))
 
     runner = unittest.TextTestRunner(verbosity=verbose)
 
