@@ -131,10 +131,10 @@ class FTPHandler(PbBaseHandler):
         self._user = user
         self._password = password
         self._passive = bool(passive)
-        self._remote_dir = remote_dir
+        self._remote_dir = '/'
         self._tls = bool(tls)
         self._tls_verify = None
-        self._tz = ftp_tz
+        self._tz = tz
         self._timeout = DEFAULT_FTP_TIMEOUT
         self._max_stor_attempts = DEFAULT_MAX_STOR_ATTEMPTS
 
@@ -155,6 +155,7 @@ class FTPHandler(PbBaseHandler):
             quiet=quiet,
         )
 
+        self.remote_dir = remote_dir
         self.port = port
         self.tls_verify = tls_verify
         self.timeout = timeout
@@ -232,6 +233,19 @@ class FTPHandler(PbBaseHandler):
             self._remote_dir = '/'
         else:
             self._remote_dir = str(value)
+
+    # -----------------------------------------------------------
+    @property
+    def tz(self):
+        """The timezone of all operations."""
+        return self._tz
+
+    @tz.setter
+    def tz(self, value):
+        if value is None:
+            self._tz = None
+        else:
+            self._tz = str(value)
 
     # -----------------------------------------------------------
     @property
@@ -348,6 +362,7 @@ class FTPHandler(PbBaseHandler):
         res['user'] = self.user
         res['password'] = self.password
         res['remote_dir'] = self.remote_dir
+        res['tz'] = self.tz
         res['connected'] = self.connected
         res['logged_in'] = self.logged_in
         res['passive'] = self.passive
