@@ -103,7 +103,29 @@ class TestFtpHandler(FtpBackupTestcase):
         self.assertEqual(ftp.tz, DEFAULT_FTP_TZ)
         self.assertEqual(ftp.user, DEFAULT_FTP_USER)
 
+    # -------------------------------------------------------------------------
+    def test_handler_object_tls(self):
 
+        LOG.info("Testing init of a FTP handler object with TLS support ...")
+
+        from ftp_backup.ftp_handler import FTPHandler
+
+        ftp = FTPHandler(
+            appname=self.appname,
+            tls=True,
+            verbose=self.verbose,
+        )
+
+        if self.verbose > 1:
+            LOG.debug("repr of FTPHandler object: %r", ftp)
+
+        if self.verbose > 2:
+            LOG.debug("FTPHandler object:\n%s", pp(ftp.as_dict(True)))
+
+        LOG.info("Checking FTP handler object for default values ...")
+        self.assertIsInstance(ftp.ftp, FTP_TLS)
+        self.assertEqual(ftp.tls, True)
+        self.assertEqual(ftp.tls_verify, None)
 
 # =============================================================================
 
@@ -121,6 +143,7 @@ if __name__ == '__main__':
     suite.addTest(TestFtpHandler('test_import_ftp_dir', verbose))
     suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
     suite.addTest(TestFtpHandler('test_handler_object', verbose))
+    suite.addTest(TestFtpHandler('test_handler_object_tls', verbose))
 
     runner = unittest.TextTestRunner(verbosity=verbose)
 
