@@ -29,7 +29,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -503,7 +503,7 @@ class FTPHandler(PbBaseHandler):
             self.mkdir(directory)
 
     # -------------------------------------------------------------------------
-    def mkdir(self, directory)
+    def mkdir(self, directory):
 
         if not self.ftp or not self.logged_in:
             msg = "Cannot create %r, not connected or logged in." % (directory)
