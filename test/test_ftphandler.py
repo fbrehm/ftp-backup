@@ -27,6 +27,8 @@ try:
 except ImportError:
     import unittest
 
+from mock import MagicMock
+
 libdir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), '..', 'lib'))
 sys.path.insert(0, libdir)
 

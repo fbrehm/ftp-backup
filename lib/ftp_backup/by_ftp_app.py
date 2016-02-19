@@ -33,6 +33,9 @@ from pb_base.handler import PbBaseHandlerError
 from pb_base.cfg_app import PbCfgApp
 
 import ftp_backup
+from ftp_backup import DEFAULT_LOCAL_DIRECTORY
+from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
+from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
 from ftp_backup.ftp_dir import DirEntry
 
@@ -47,13 +50,6 @@ DEFAULT_FTP_DIR = '/backup'
 DEFAULT_FTP_TZ = 'UTC'
 
 DEFAULT_FTP_TIMEOUT = 60
-
-DEFAULT_LOCAL_DIRECTORY = os.sep + os.path.join('var', 'backup')
-
-DEFAULT_COPIES_YEARLY = 2
-DEFAULT_COPIES_MONTHLY = 2
-DEFAULT_COPIES_WEEKLY = 2
-DEFAULT_COPIES_DAILY = 2
 
 APP_VERSION = ftp_backup.__version__
 try:
@@ -155,7 +151,7 @@ class BackupByFtpApp(PbCfgApp):
         h = "Use TLS for communication with the FTP server (default: False)."
         ftp_group.add_argument('--tls', action='store_true', help=h)
 
-        h = 'The username on the FTP server (default: %r).' % (DEFAULT_FTP_PWD)
+        h = 'The username on the FTP server (default: %r).' % (DEFAULT_FTP_USER)
         ftp_group.add_argument('--user', metavar='USER', help=h)
 
         h = 'The user password on the FTP server (default: %r).' % (DEFAULT_FTP_PWD)
