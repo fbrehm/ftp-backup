@@ -26,7 +26,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 
-__version__ = '0.2.1'
+__version__ = '0.3.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class SFTPHandler(PbBaseHandler):
         self, host=DEFAULT_SSH_SERVER, port=DEFAULT_SSH_PORT, user=DEFAULT_SSH_USER,
             local_dir=DEFAULT_LOCAL_DIRECTORY, remote_dir=None,
             timeout=DEFAULT_SSH_TIMEOUT, key_file=DEFAULT_SSH_KEY,
-            appname=None, verbose=0, version=__version__, base_dir=None,
+            appname=None, base_dir=None, verbose=0, version=__version__,
             use_stderr=False, simulate=False, sudo=False, quiet=False,
             *targs, **kwargs):
 
@@ -185,6 +185,7 @@ class SFTPHandler(PbBaseHandler):
         self.user = user
         self.start_remote_dir = remote_dir
         self.key_file = key_file
+        self.local_dir = local_dir
 
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -282,6 +283,36 @@ class SFTPHandler(PbBaseHandler):
 
     # -----------------------------------------------------------
     @property
+    def local_dir(self):
+        """The local directory, from where to backup the files."""
+        return self._local_dir
+
+    @local_dir.setter
+    def local_dir(self, value):
+
+        if value is None:
+            raise ValueError("The local directory may not be set to None.")
+
+        ldir = None
+        if isinstance(value, Path):
+            ldir = value
+        else:
+            ldir = PosixPath(str(value))
+
+        if str(ldir).startswith('~'):
+            ldir = ldir.__class__(os.path.expanduser(str(ldir)))
+
+        if self.connected:
+            if not ldir.is_dir():
+                msg = "Directory %r does not exists or is not a directory." % (ldir)
+                raise SFTPLocalPathError(msg)
+            os.chdir(str(ldir))
+
+        self.base_dir = str(ldir)
+        self._local_dir = ldir
+
+    # -----------------------------------------------------------
+    @property
     def key_file(self):
         """The private SSH key file for establishing the SSH connection."""
         return self._key_file
@@ -324,6 +355,7 @@ class SFTPHandler(PbBaseHandler):
         res['remote_dir'] = self.remote_dir
         res['connected'] = self.connected
         res['key_file'] = self.key_file
+        res['local_dir'] = self.local_dir
         # res['timeout'] = self.timeout
 
         return res
@@ -333,6 +365,7 @@ class SFTPHandler(PbBaseHandler):
 
         LOG.debug("Checking all local paths ...")
 
+        #---------
         if self.verbose > 1:
             LOG.debug("Checking SSH key file %r ...", str(self.key_file))
 
@@ -347,6 +380,15 @@ class SFTPHandler(PbBaseHandler):
         if not os.access(str(self.key_file), os.R_OK):
             msg = "No read access to %r." % (str(self.key_file))
             raise SFTPHandlerError(msg)
+
+        #---------
+        if self.verbose > 1:
+            LOG.debug("Checking local backup directory %r ...", str(self.local_dir))
+
+        if not self.local_dir.is_dir():
+            msg = "Directory %r does not exists or is not a directory." % (self.local_dir)
+            raise SFTPLocalPathError(msg)
+        os.chdir(str(self.local_dir))
 
     # -------------------------------------------------------------------------
     def connect(self):

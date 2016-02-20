@@ -46,7 +46,7 @@ from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 
 LOG = logging.getLogger(__name__)
 
@@ -78,7 +78,8 @@ class BackupBySftpApp(PbCfgApp):
         backup directories on the SSH server should be stalled.
         """
 
-        self.handler = SFTPHandler(appname=appname, verbose=verbose, initialized=False)
+        self.handler = SFTPHandler(appname=appname, verbose=verbose, initialized=False,
+            base_dir=str(DEFAULT_LOCAL_DIRECTORY))
 
         self.copies = {
             'yearly': DEFAULT_COPIES_YEARLY,
@@ -89,6 +90,7 @@ class BackupBySftpApp(PbCfgApp):
 
         super(BackupBySftpApp, self).__init__(
             appname=appname,
+            base_dir=str(DEFAULT_LOCAL_DIRECTORY),
             verbose=verbose,
             version=APP_VERSION,
             description=textwrap.dedent(description),
@@ -163,15 +165,19 @@ class BackupBySftpApp(PbCfgApp):
         self.handler.verbose = self.verbose
         self.handler.base_dir = self.base_dir
 
-#        if self.args.local_dir:
-#            self.handler.local_dir = PosixPath(self.args.local_dir)
+        if self.args.local_dir:
+            self.base_dir = self.args.local_dir
+            self.handler.local_dir = self.args.local_dir
 
         if self.args.host:
             self.handler.host = self.args.host
+
         if self.args.port and self.args.port > 0:
             self.handler.port = self.args.port
+
         if self.args.user:
             self.handler.user = self.args.user
+
         if self.args.remote_dir:
             self.start_remote_dir = PurePosixPath(self.args.remote_dir)
 
@@ -199,9 +205,10 @@ class BackupBySftpApp(PbCfgApp):
 
         for section in self.cfg:
 
-#            if section.lower() == 'global':
-#                if 'backup_dir' in self.cfg[section] and not self.args.local_dir:
-#                    self.handler.local_dir = PosixPath(self.cfg[section]['backup_dir'])
+            if section.lower() == 'global':
+                if 'backup_dir' in self.cfg[section] and not self.args.local_dir:
+                    self.base_dir = self.cfg[section]['backup_dir']
+                    self.handler.local_dir = self.cfg[section]['backup_dir']
 
             if section.lower() == 'sftp' or section.lower() == 'scp':
 
