@@ -26,7 +26,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 
-__version__ = '0.1.1'
+__version__ = '0.2.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -47,6 +47,13 @@ class SFTPHandlerError(PbBaseHandlerError):
     """
     pass
 
+
+# =============================================================================
+class SFTPLocalPathError(SFTPHandlerError):
+    """
+    Exception class for all exceptions belonging to local paths.
+    """
+    pass
 
 # =============================================================================
 class SFTPSetOnConnectedError(SFTPHandlerError):
@@ -152,7 +159,7 @@ class SFTPHandler(PbBaseHandler):
         self._remote_dir = None
         self.ssh_client = None
         self.sftp_client = None
-        self._key_file = key_file
+        self._key_file = DEFAULT_SSH_KEY
         self._timeout=DEFAULT_SSH_TIMEOUT
 
         self._local_dir = DEFAULT_LOCAL_DIRECTORY
@@ -177,6 +184,7 @@ class SFTPHandler(PbBaseHandler):
         self.port = port
         self.user = user
         self.start_remote_dir = remote_dir
+        self.key_file = key_file
 
         self.ssh_client = paramiko.SSHClient()
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -250,7 +258,7 @@ class SFTPHandler(PbBaseHandler):
         if value is None:
             self._start_remote_dir = PurePosixPath('/')
         else:
-            if isinstance(value, Path):
+            if isinstance(value, PurePath):
                 self._start_remote_dir = value
             else:
                 self._start_remote_dir = PurePosixPath(str(value))
@@ -272,6 +280,30 @@ class SFTPHandler(PbBaseHandler):
             self.sftp_client.chdir(str(value))
         self._remote_dir = PurePosixPath(self.sftp_client.getcwd())
 
+    # -----------------------------------------------------------
+    @property
+    def key_file(self):
+        """The private SSH key file for establishing the SSH connection."""
+        return self._key_file
+
+    @key_file.setter
+    def key_file(self, value):
+        if self.connected:
+            raise SFTPSetOnConnectedError('key_file', value)
+        kfile = None
+        if value is None:
+            kfile = DEFAULT_SSH_KEY
+        else:
+            if isinstance(value, Path):
+                kfile = value
+            else:
+                kfile = PosixPath(str(value))
+
+        if str(kfile).startswith('~'):
+            kfile = kfile.expanduser()
+
+        self._key_file = kfile
+
     # -------------------------------------------------------------------------
     def as_dict(self, short=False):
         """
@@ -291,8 +323,35 @@ class SFTPHandler(PbBaseHandler):
         res['start_remote_dir'] = self.start_remote_dir
         res['remote_dir'] = self.remote_dir
         res['connected'] = self.connected
+        res['key_file'] = self.key_file
         # res['timeout'] = self.timeout
 
         return res
+
+    # -------------------------------------------------------------------------
+    def _check_local_paths(self):
+
+        LOG.debug("Checking all local paths ...")
+
+        if self.verbose > 1:
+            LOG.debug("Checking SSH key file %r ...", str(self.key_file))
+
+        if not self.key_file.exists():
+            msg = "SSH key file %r does not exists." % (str(self.key_file))
+            raise SFTPHandlerError(msg)
+
+        if not self.key_file.is_file():
+            msg = "SSH key file %r is not a regular file." % (str(self.key_file))
+            raise SFTPHandlerError(msg)
+
+        if not os.access(str(self.key_file), os.R_OK):
+            msg = "No read access to %r." % (str(self.key_file))
+            raise SFTPHandlerError(msg)
+
+    # -------------------------------------------------------------------------
+    def connect(self):
+
+        self._check_local_paths()
+
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

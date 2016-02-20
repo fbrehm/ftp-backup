@@ -40,12 +40,13 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
+from ftp_backup.sftp_handler import SFTPHandlerError, SFTPLocalPathError
 from ftp_backup.sftp_handler import SFTPHandler
 from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 LOG = logging.getLogger(__name__)
 
@@ -77,21 +78,7 @@ class BackupBySftpApp(PbCfgApp):
         backup directories on the SSH server should be stalled.
         """
 
-        self.handler = SFTPHandler(appname=appname, verbose=verbose)
-
-        self.ssh_host = DEFAULT_SSH_SERVER
-        self.ssh_port = DEFAULT_SSH_PORT
-        self.ssh_user = DEFAULT_SSH_USER
-        self.remote_dir = DEFAULT_REMOTE_DIR
-        self.ssh_timeout = DEFAULT_SSH_TIMEOUT
-        self.ssh_key = DEFAULT_SSH_KEY
-
-        self.simulate = False
-
-        self.connected = False
-        self.logged_in = False
-
-        self.local_directory = DEFAULT_LOCAL_DIRECTORY
+        self.handler = SFTPHandler(appname=appname, verbose=verbose, initialized=False)
 
         self.copies = {
             'yearly': DEFAULT_COPIES_YEARLY,
@@ -173,28 +160,26 @@ class BackupBySftpApp(PbCfgApp):
     def perform_arg_parser(self):
 
         super(BackupBySftpApp, self).perform_arg_parser()
-        #self.handler.verbose = verbose
+        self.handler.verbose = self.verbose
+        self.handler.base_dir = self.base_dir
 
-        if self.args.local_dir:
-            self.local_directory = PosixPath(self.args.local_dir)
+#        if self.args.local_dir:
+#            self.handler.local_dir = PosixPath(self.args.local_dir)
 
         if self.args.host:
-            self.ssh_host = self.args.host
+            self.handler.host = self.args.host
         if self.args.port and self.args.port > 0:
-            self.ssh_port = self.args.port
+            self.handler.port = self.args.port
         if self.args.user:
-            self.ssh_user = self.args.user
+            self.handler.user = self.args.user
         if self.args.remote_dir:
-            self.remote_dir = PurePosixPath(self.args.remote_dir)
+            self.start_remote_dir = PurePosixPath(self.args.remote_dir)
 
         if self.args.ssh_key:
-            if self.args.ssh_key.startswith('~'):
-                self.ssh_key = PosixPath(os.path.expanduser(self.args.ssh_key))
-            else:
-                self.ssh_key = PosixPath(self.args.ssh_key)
+            self.handler.key_file = self.args.ssh_key
 
         if self.args.test:
-            self.simulate = True
+            self.handler.simulate = True
 
         if self.args.copies_yearly and self.args.copies_yearly > 0:
             self.copies['yearly'] = self.args.copies_yearly
@@ -214,14 +199,15 @@ class BackupBySftpApp(PbCfgApp):
 
         for section in self.cfg:
 
-            if section.lower() == 'global':
-                if 'backup_dir' in self.cfg[section] and not self.args.local_dir:
-                    self.local_directory = PosixPath(self.cfg[section]['backup_dir'])
+#            if section.lower() == 'global':
+#                if 'backup_dir' in self.cfg[section] and not self.args.local_dir:
+#                    self.handler.local_dir = PosixPath(self.cfg[section]['backup_dir'])
 
             if section.lower() == 'sftp' or section.lower() == 'scp':
 
                 if 'host' in self.cfg[section] and not self.args.host:
-                    self.ssh_host = self.cfg[section]['host']
+                    self.handler.host = self.cfg[section]['host']
+
                 if 'port' in self.cfg[section] and not self.args.port:
                     p = DEFAULT_SSH_PORT
                     try:
@@ -230,19 +216,16 @@ class BackupBySftpApp(PbCfgApp):
                         msg = int_msg_tpl % ('SFTP', 'port', self.cfg[section]['port'], str(e))
                         LOG.error(msg)
                     else:
-                        self.ssh_port = p
+                        self.handler.port = p
+
                 if 'user' in self.cfg[section] and not self.args.user:
-                    self.ssh_user = self.cfg[section]['user']
+                    self.handler.user = self.cfg[section]['user']
 
                 if 'dir' in self.cfg[section] and not self.args.remote_dir:
-                    self.remote_dir = PurePosixPath(self.cfg[section]['dir'])
+                    self.handler.start_remote_dir = PurePosixPath(self.cfg[section]['dir'])
 
                 if 'key_file' in self.cfg[section] and not self.args.ssh_key:
-                    d = self.cfg[section]['key_file']
-                    if d.startswith('~'):
-                        self.ssh_key = PosixPath(os.path.expanduser(d))
-                    else:
-                        self.ssh_key = PosixPath(d)
+                    self.handler.key_file = self.cfg[section]['key_file']
 
             if section.lower() == 'copies':
 
@@ -289,27 +272,17 @@ class BackupBySftpApp(PbCfgApp):
     def _run(self):
         """The underlaying startpoint of the application."""
 
-        if not self.local_directory.is_dir():
-            LOG.error("Local directory %r does not exists.", str(self.local_directory))
-            sys.exit(5)
-
-        try:
-            if not self.ssh_key.exists():
-                LOG.error("SSH key file %r does not exists.", str(self.ssh_key))
-                sys.exit(1)
-        except PermissionError as e:
-            LOG.error("Wrong SSH key file: %s", e)
-            sys.exit(1)
-
-        if not self.ssh_key.is_file():
-            LOG.error("SSH key file %r is not a regular file.", str(self.ssh_key))
-            sys.exit(1)
-
-        if not os.access(str(self.ssh_key), os.R_OK):
-            LOG.error("No read access to %r.", str(self.ssh_key.path))
+#        if not self.local_directory.is_dir():
+#            LOG.error("Local directory %r does not exists.", str(self.local_directory))
+#            sys.exit(5)
 
         re_backup_dirs = re.compile(r'^\s*\d{4}[-_]+\d\d[-_]+\d\d[-_]+\d+\s*$')
         re_whitespace = re.compile(r'\s+')
+
+        try:
+            self.handler.connect()
+        except(PermissionError, SFTPLocalPathError) as e:
+            self.exit(1, str(e))
 
     # -------------------------------------------------------------------------
     def post_run(self):
@@ -318,8 +291,7 @@ class BackupBySftpApp(PbCfgApp):
 
         """
 
-        self.sftp_client = None
-        self.ssh_client = None
+        self.handler = None
 
 # =============================================================================
 
