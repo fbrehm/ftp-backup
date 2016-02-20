@@ -26,7 +26,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -153,6 +153,7 @@ class SFTPHandler(PbBaseHandler):
         self.ssh_client = None
         self.sftp_client = None
         self._key_file = key_file
+        self._timeout=DEFAULT_SSH_TIMEOUT
 
         self._local_dir = DEFAULT_LOCAL_DIRECTORY
 
@@ -176,6 +177,9 @@ class SFTPHandler(PbBaseHandler):
         self.port = port
         self.user = user
         self.start_remote_dir = remote_dir
+
+        self.ssh_client = paramiko.SSHClient()
+        self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     # -----------------------------------------------------------
     @property
