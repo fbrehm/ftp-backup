@@ -26,8 +26,6 @@ from pathlib import PurePosixPath, PosixPath
 # Third party modules
 import six
 
-import paramiko
-
 # Own modules
 from pb_logging.colored import ColoredFormatter
 
@@ -42,17 +40,14 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.2.1'
+from ftp_backup.sftp_handler import SFTPHandler
+from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
+from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
+from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
+
+__version__ = '0.3.1'
 
 LOG = logging.getLogger(__name__)
-
-DEFAULT_SSH_SERVER = 'rsync.hidrive.strato.com'
-DEFAULT_SSH_PORT = 22
-DEFAULT_SSH_USER = 'frank.brehm'
-DEFAULT_REMOTE_DIR = PurePosixPath(
-    os.sep + os.path.join('users', DEFAULT_SSH_USER, 'Backup'))
-DEFAULT_SSH_TIMEOUT = 60
-DEFAULT_SSH_KEY = PosixPath(os.path.expanduser('~backup/.ssh/id_rsa'))
 
 APP_VERSION = ftp_backup.__version__
 try:
@@ -82,6 +77,8 @@ class BackupBySftpApp(PbCfgApp):
         backup directories on the SSH server should be stalled.
         """
 
+        self.handler = SFTPHandler(appname=appname, verbose=verbose)
+
         self.ssh_host = DEFAULT_SSH_SERVER
         self.ssh_port = DEFAULT_SSH_PORT
         self.ssh_user = DEFAULT_SSH_USER
@@ -93,9 +90,6 @@ class BackupBySftpApp(PbCfgApp):
 
         self.connected = False
         self.logged_in = False
-
-        self.ssh_client = None
-        self.sftp_client = None
 
         self.local_directory = DEFAULT_LOCAL_DIRECTORY
 
@@ -116,15 +110,13 @@ class BackupBySftpApp(PbCfgApp):
             need_config_file=False,
         )
         self.post_init()
-        self.ssh_client = paramiko.SSHClient()
 
         self.initialized = True
 
     # -------------------------------------------------------------------------
     def __del__(self):
 
-        self.sftp_client = None
-        self.ssh_client = None
+        self.handler = None
 
     # -------------------------------------------------------------------------
     def init_arg_parser(self):
@@ -181,6 +173,7 @@ class BackupBySftpApp(PbCfgApp):
     def perform_arg_parser(self):
 
         super(BackupBySftpApp, self).perform_arg_parser()
+        self.handler.verbose = verbose
 
         if self.args.local_dir:
             self.local_directory = PosixPath(self.args.local_dir)
