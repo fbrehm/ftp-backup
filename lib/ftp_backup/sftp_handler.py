@@ -24,6 +24,8 @@ from pb_base.common import to_bool, pp, bytes2human
 from pb_base.handler import PbBaseHandlerError
 from pb_base.handler import PbBaseHandler
 
+from ftp_backup import DEFAULT_LOCAL_DIRECTORY
+
 __version__ = '0.1.0'
 
 LOG = logging.getLogger(__name__)
@@ -225,7 +227,7 @@ class SFTPHandler(PbBaseHandler):
     def user(self, value):
         if self.connected:
             raise SFTPSetOnConnectedError('user', value)
-        if not user:
+        if not value:
             self._user = DEFAULT_SSH_USER
             return
         self._user = str(value).strip()

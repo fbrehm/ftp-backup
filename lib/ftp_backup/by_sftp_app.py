@@ -173,7 +173,7 @@ class BackupBySftpApp(PbCfgApp):
     def perform_arg_parser(self):
 
         super(BackupBySftpApp, self).perform_arg_parser()
-        self.handler.verbose = verbose
+        #self.handler.verbose = verbose
 
         if self.args.local_dir:
             self.local_directory = PosixPath(self.args.local_dir)
