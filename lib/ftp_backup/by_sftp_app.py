@@ -13,11 +13,11 @@ import sys
 import logging
 import textwrap
 import os
-import ftplib
 import ssl
 import re
 import glob
 import time
+import socket
 
 from datetime import datetime
 
@@ -46,7 +46,7 @@ from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 LOG = logging.getLogger(__name__)
 
@@ -308,8 +308,26 @@ class BackupBySftpApp(PbCfgApp):
             self.exit(1, str(e))
 
         LOG.info("Starting ...")
-        time.sleep(2)
-        #self.handler.disconnect()
+
+        subdir = socket.gethostname()
+
+        try:
+            if self.handler.exists(subdir):
+                LOG.info("Remote file %r exists.", subdir)
+                if self.handler.is_dir(subdir):
+                    LOG.info("Remote file %r is a directory.", subdir)
+                else:
+                    msg = "Remote file %r is NOT a directory." % (subdir)
+                    self.exit(5, msg)
+            else:
+                LOG.warn("Remote file %r does not exists.", subdir)
+                self.handler.mkdir(subdir)
+
+            self.handler.remote_dir = subdir
+            LOG.info("Current remote directory is now %r.", self.handler.remote_dir)
+
+        finally:
+            self.handler.disconnect()
 
     # -------------------------------------------------------------------------
     def post_run(self):

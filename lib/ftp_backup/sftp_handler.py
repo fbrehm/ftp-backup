@@ -11,6 +11,8 @@
 # Standard modules
 import logging
 import os
+import errno
+import stat
 
 from numbers import Number
 
@@ -28,7 +30,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -444,5 +446,53 @@ class SFTPHandler(PbBaseHandler):
         LOG.info("Disconnecting from %s ...", self.host)
         self.sftp_client = None
         self.ssh_client.close()
+        self._connected = False
+
+    # -------------------------------------------------------------------------
+    def exists(self, remote_file):
+
+        rfile = str(remote_file)
+        if not self.connected:
+            raise SFTPHandlerError("Cannot check existence of %r, not connected." % (rfile))
+
+        try:
+            self.sftp_client.stat(rfile)
+        except FileNotFoundError:
+            return False
+        return True
+
+    # -------------------------------------------------------------------------
+    def mkdir(self, path, mode=None):
+
+        if mode is None:
+            mode = 0o755
+        path = str(path)
+        if not self.connected:
+            raise SFTPHandlerError("Cannot create remote %r, not connected." % (rpath))
+
+        LOG.info("Creating remote directory %r with mode %04o ...", path, mode)
+        self.sftp_client.mkdir(path, mode)
+
+    # -------------------------------------------------------------------------
+    def is_dir(self, remote_path):
+
+        rpath = str(remote_path)
+        if not self.connected:
+            raise SFTPHandlerError("Cannot check stat of %r, not connected." % (rpath))
+
+        try:
+            fstat = self.sftp_client.stat(rpath)
+        except FileNotFoundError:
+            return False
+
+        if self.verbose > 2:
+            LOG.debug("Got a state of %r: %r", rpath, fstat)
+        mode = fstat.st_mode
+        if self.verbose > 1:
+            LOG.debug("Mode of %r: %04o", rpath, stat.S_IMODE(mode))
+
+        if stat.S_ISDIR(mode):
+            return True
+        return False
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
