@@ -46,7 +46,7 @@ from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.3.3'
+__version__ = '0.4.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -225,6 +225,15 @@ class BackupBySftpApp(PbCfgApp):
                     else:
                         self.handler.port = p
 
+                if 'timeout' in self.cfg[section]:
+                    try:
+                        timeout = int(self.cfg[section]['timeout'])
+                    except ValueError as e:
+                        msg = int_msg_tpl % ('SFTP', 'timeout', self.cfg[section]['timeout'], str(e))
+                        LOG.error(msg)
+                    else:
+                        self.handler.timeout = timeout
+
                 if 'user' in self.cfg[section] and not self.args.user:
                     self.handler.user = self.cfg[section]['user']
 
@@ -276,12 +285,19 @@ class BackupBySftpApp(PbCfgApp):
                         self.copies['daily'] = v
 
     # -------------------------------------------------------------------------
+    def pre_run(self):
+
+        super(BackupBySftpApp, self).pre_run()
+
+        paramiko_logger = logging.getLogger('paramiko.transport')
+        if self.verbose < 1:
+            paramiko_logger.setLevel(logging.WARNING)
+        elif self.verbose < 2:
+            paramiko_logger.setLevel(logging.INFO)
+
+    # -------------------------------------------------------------------------
     def _run(self):
         """The underlaying startpoint of the application."""
-
-#        if not self.local_directory.is_dir():
-#            LOG.error("Local directory %r does not exists.", str(self.local_directory))
-#            sys.exit(5)
 
         re_backup_dirs = re.compile(r'^\s*\d{4}[-_]+\d\d[-_]+\d\d[-_]+\d+\s*$')
         re_whitespace = re.compile(r'\s+')
@@ -290,6 +306,10 @@ class BackupBySftpApp(PbCfgApp):
             self.handler.connect()
         except(PermissionError, SFTPLocalPathError) as e:
             self.exit(1, str(e))
+
+        LOG.info("Starting ...")
+        time.sleep(2)
+        #self.handler.disconnect()
 
     # -------------------------------------------------------------------------
     def post_run(self):

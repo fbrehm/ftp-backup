@@ -12,6 +12,8 @@
 import logging
 import os
 
+from numbers import Number
+
 from pathlib import PurePath, PurePosixPath, Path, PosixPath
 
 # Third party modules
@@ -26,7 +28,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
 
 LOG = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ DEFAULT_SSH_USER = 'frank.brehm'
 DEFAULT_REMOTE_DIR = PurePosixPath(
     os.sep + os.path.join('users', DEFAULT_SSH_USER, 'Backup'))
 DEFAULT_SSH_TIMEOUT = 60
+MAX_SSH_TIMEOUT = 3600
 DEFAULT_SSH_KEY = PosixPath(os.path.expanduser('~backup/.ssh/id_rsa'))
 
 
@@ -160,7 +163,7 @@ class SFTPHandler(PbBaseHandler):
         self.ssh_client = None
         self.sftp_client = None
         self._key_file = DEFAULT_SSH_KEY
-        self._timeout=DEFAULT_SSH_TIMEOUT
+        self._timeout = DEFAULT_SSH_TIMEOUT
 
         self._local_dir = DEFAULT_LOCAL_DIRECTORY
 
@@ -335,6 +338,21 @@ class SFTPHandler(PbBaseHandler):
 
         self._key_file = kfile
 
+    # -----------------------------------------------------------
+    @property
+    def timeout(self):
+        """The listening TCP port of the SSH server."""
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        if not isinstance(value, Number):
+            raise TypeError("The timeout must be a number, not %r." % (value))
+        if value < 1 or value >= MAX_SSH_TIMEOUT:
+            msg = "Invalid timeout %r given." % (value)
+            raise ValueError(msg)
+        self._timeout = value
+
     # -------------------------------------------------------------------------
     def as_dict(self, short=False):
         """
@@ -356,9 +374,15 @@ class SFTPHandler(PbBaseHandler):
         res['connected'] = self.connected
         res['key_file'] = self.key_file
         res['local_dir'] = self.local_dir
-        # res['timeout'] = self.timeout
+        res['timeout'] = self.timeout
 
         return res
+
+    # -------------------------------------------------------------------------
+    def __del__(self):
+
+        if self.connected:
+            self.disconnect()
 
     # -------------------------------------------------------------------------
     def _check_local_paths(self):
@@ -393,7 +417,32 @@ class SFTPHandler(PbBaseHandler):
     # -------------------------------------------------------------------------
     def connect(self):
 
+        if self.connected:
+            LOG.warning("The SFTP client is already connected.")
+            return
+
         self._check_local_paths()
 
+        LOG.info("SSH connect to %s@%s ...", self.user, self.host)
+        self.ssh_client.connect(
+            self.host, port=self.port, username=self.user, key_filename=str(self.key_file),
+            timeout=self.timeout)
+        self._connected = True
+
+        self.sftp_client = self.ssh_client.open_sftp()
+
+        self.sftp_client.chdir(str(self.start_remote_dir))
+        self._remote_dir = PurePosixPath(self.sftp_client.getcwd())
+
+    # -------------------------------------------------------------------------
+    def disconnect(self):
+
+        if not self.connected:
+            LOG.warning("The SFTP client is already disconnected.")
+            return
+
+        LOG.info("Disconnecting from %s ...", self.host)
+        self.sftp_client = None
+        self.ssh_client.close()
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
