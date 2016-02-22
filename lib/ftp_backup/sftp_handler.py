@@ -32,8 +32,10 @@ from pb_base.handler import PbBaseHandlerError
 from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
+from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
+from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 
 LOG = logging.getLogger(__name__)
 
@@ -175,6 +177,13 @@ class SFTPHandler(PbBaseHandler):
         self._simulate = False
 
         self._connected = False
+
+        self.copies = {
+            'yearly': DEFAULT_COPIES_YEARLY,
+            'monthly': DEFAULT_COPIES_MONTHLY,
+            'weekly': DEFAULT_COPIES_WEEKLY,
+            'daily': DEFAULT_COPIES_DAILY,
+        }
 
         super(SFTPHandler, self).__init__(
             appname=appname,

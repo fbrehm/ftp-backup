@@ -46,7 +46,7 @@ from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.4.3'
+__version__ = '0.4.4'
 
 LOG = logging.getLogger(__name__)
 
@@ -80,13 +80,6 @@ class BackupBySftpApp(PbCfgApp):
 
         self.handler = SFTPHandler(appname=appname, verbose=verbose, initialized=False,
             base_dir=str(DEFAULT_LOCAL_DIRECTORY))
-
-        self.copies = {
-            'yearly': DEFAULT_COPIES_YEARLY,
-            'monthly': DEFAULT_COPIES_MONTHLY,
-            'weekly': DEFAULT_COPIES_WEEKLY,
-            'daily': DEFAULT_COPIES_DAILY,
-        }
 
         super(BackupBySftpApp, self).__init__(
             appname=appname,
@@ -188,13 +181,13 @@ class BackupBySftpApp(PbCfgApp):
             self.handler.simulate = True
 
         if self.args.copies_yearly and self.args.copies_yearly > 0:
-            self.copies['yearly'] = self.args.copies_yearly
+            self.handler.copies['yearly'] = self.args.copies_yearly
         if self.args.copies_monthly and self.args.copies_monthly > 0:
-            self.copies['monthly'] = self.args.copies_monthly
+            self.handler.copies['monthly'] = self.args.copies_monthly
         if self.args.copies_weekly and self.args.copies_weekly > 0:
-            self.copies['weekly'] = self.args.copies_weekly
+            self.handler.copies['weekly'] = self.args.copies_weekly
         if self.args.copies_daily and self.args.copies_daily > 0:
-            self.copies['daily'] = self.args.copies_daily
+            self.handler.copies['daily'] = self.args.copies_daily
 
     # -------------------------------------------------------------------------
     def perform_config(self):
@@ -253,7 +246,7 @@ class BackupBySftpApp(PbCfgApp):
                         msg = int_msg_tpl % (
                             'Copies', 'yearly', self.cfg[section]['yearly'], str(e))
                     else:
-                        self.copies['yearly'] = v
+                        self.handler.copies['yearly'] = v
 
                 if 'monthly' in self.cfg[section] and not self.args.copies_monthly:
                     v = DEFAULT_COPIES_MONTHLY
@@ -263,7 +256,7 @@ class BackupBySftpApp(PbCfgApp):
                         msg = int_msg_tpl % (
                             'Copies', 'monthly', self.cfg[section]['monthly'], str(e))
                     else:
-                        self.copies['monthly'] = v
+                        self.handler.copies['monthly'] = v
 
                 if 'weekly' in self.cfg[section] and not self.args.copies_weekly:
                     v = DEFAULT_COPIES_WEEKLY
@@ -273,7 +266,7 @@ class BackupBySftpApp(PbCfgApp):
                         msg = int_msg_tpl % (
                             'Copies', 'weekly', self.cfg[section]['weekly'], str(e))
                     else:
-                        self.copies['weekly'] = v
+                        self.handler.copies['weekly'] = v
 
                 if 'daily' in self.cfg[section] and not self.args.copies_daily:
                     v = DEFAULT_COPIES_DAILY
@@ -282,7 +275,7 @@ class BackupBySftpApp(PbCfgApp):
                     except ValueError as e:
                         msg = int_msg_tpl % ('Copies', 'daily', self.cfg[section]['daily'], str(e))
                     else:
-                        self.copies['daily'] = v
+                        self.handler.copies['daily'] = v
 
     # -------------------------------------------------------------------------
     def pre_run(self):
