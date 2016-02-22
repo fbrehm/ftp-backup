@@ -13,8 +13,11 @@ import logging
 import os
 import errno
 import stat
+import re
 
 from numbers import Number
+
+from collections import OrderedDict
 
 from pathlib import PurePath, PurePosixPath, Path, PosixPath
 
@@ -30,7 +33,7 @@ from pb_base.handler import PbBaseHandler
 
 from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 
-__version__ = '0.4.1'
+__version__ = '0.5.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -494,5 +497,49 @@ class SFTPHandler(PbBaseHandler):
         if stat.S_ISDIR(mode):
             return True
         return False
+
+    # -------------------------------------------------------------------------
+    def dir_list(self, path='.'):
+
+        path = str(path)
+
+        if not self.connected:
+            raise SFTPHandlerError("Cannot get directory list of %r, not connected." % (path))
+        LOG.debug("Getting directory list of %r ...", path)
+
+        dlist = OrderedDict()
+        for entry in self.sftp_client.listdir(path):
+            dlist[entry] = {}
+
+        for entry in dlist:
+            entry_path = os.path.join(path, entry)
+            entry_stat = self.sftp_client.stat(entry_path)
+            if self.verbose > 2:
+                LOG.debug("Got stat of %r: %r.", entry_path, entry_stat)
+            dlist[entry] = entry_stat
+
+        return dlist
+
+    # -------------------------------------------------------------------------
+    def cleanup_old_backupdirs(self):
+
+        LOG.info("Cleaning up old backup directories ...")
+        re_backup_dirs = re.compile(r'^\s*\d{4}[-_]+\d\d[-_]+\d\d[-_]+\d+\s*$')
+
+        cur_backup_dirs = []
+        dlist = self.dir_list()
+        for entry in dlist:
+            entry_stat = dlist[entry]
+            if self.verbose > 2:
+                LOG.debug("Checking entry %r ...", pp(entry))
+            if not stat.S_ISDIR(entry_stat.st_mode):
+                if self.verbose > 2:
+                    LOG.debug("%r is not a directory.", entry)
+                continue
+            if re_backup_dirs.search(entry):
+                cur_backup_dirs.append(entry)
+
+        if self.verbose > 1:
+            LOG.debug("Found backup directories to check:\n%s", pp(cur_backup_dirs))
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

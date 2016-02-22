@@ -46,7 +46,7 @@ from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.4.2'
+__version__ = '0.4.3'
 
 LOG = logging.getLogger(__name__)
 
@@ -299,7 +299,6 @@ class BackupBySftpApp(PbCfgApp):
     def _run(self):
         """The underlaying startpoint of the application."""
 
-        re_backup_dirs = re.compile(r'^\s*\d{4}[-_]+\d\d[-_]+\d\d[-_]+\d+\s*$')
         re_whitespace = re.compile(r'\s+')
 
         try:
@@ -313,9 +312,9 @@ class BackupBySftpApp(PbCfgApp):
 
         try:
             if self.handler.exists(subdir):
-                LOG.info("Remote file %r exists.", subdir)
+                LOG.debug("Remote file %r exists.", subdir)
                 if self.handler.is_dir(subdir):
-                    LOG.info("Remote file %r is a directory.", subdir)
+                    LOG.debug("Remote file %r is a directory.", subdir)
                 else:
                     msg = "Remote file %r is NOT a directory." % (subdir)
                     self.exit(5, msg)
@@ -324,7 +323,9 @@ class BackupBySftpApp(PbCfgApp):
                 self.handler.mkdir(subdir)
 
             self.handler.remote_dir = subdir
-            LOG.info("Current remote directory is now %r.", self.handler.remote_dir)
+            LOG.info("Current main remote directory is now %r.", str(self.handler.remote_dir))
+
+            self.handler.cleanup_old_backupdirs()
 
         finally:
             self.handler.disconnect()
