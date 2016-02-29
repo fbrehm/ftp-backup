@@ -37,7 +37,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.5.4'
+__version__ = '0.5.5'
 
 LOG = logging.getLogger(__name__)
 
@@ -620,6 +620,9 @@ class SFTPHandler(PbBaseHandler):
                 dirs_delete.append(backup_dir)
         LOG.debug("Directories to remove:\n%s", pp(dirs_delete))
 
+        if dirs_delete:
+            self.remove_recursive(*dirs_delete)
+
     # -------------------------------------------------------------------------
     def _map_dirs2types(self, type_mapping, backup_dirs):
 
@@ -661,5 +664,40 @@ class SFTPHandler(PbBaseHandler):
 
         if self.verbose > 3:
             LOG.debug("Mapping of found directories to backup types:\n%s", pp(type_mapping))
+
+    # -------------------------------------------------------------------------
+    def remove_recursive(self, *items):
+
+        if not items:
+            LOG.warning("Called remove_recursive() without items to remove.")
+            return
+
+        if not self.connected:
+            raise SFTPHandlerError("Cannot remove %r, not connected." % (items))
+
+        for item in items:
+
+            ipath = item
+            if not isinstance(item, PurePosixPath):
+                ipath = PurePosixPath(str(item))
+            if str(ipath) == '.' or str(ipath) == '..':
+                LOG.warning("Cannot remove special directory %r.", str(ipath))
+                continue
+
+            if self.is_dir(ipath):
+                LOG.info("Removing recursive %r ...", str(ipath))
+                dlist = self.sftp_client.listdir(str(ipath))
+                for entry in dlist:
+                    entry_path = PurePosixPath(os.path.join(str(ipath), entry))
+                    self.remove_recursive(entry_path)
+                LOG.info("Removing directory %r ...", str(ipath))
+                if not self.simulate:
+                    self.sftp_client.rmdir(str(ipath))
+                continue
+
+            LOG.info("Removing file %r ...", str(ipath))
+            if not self.simulate:
+                self.sftp_client.remove(str(ipath))
+
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
