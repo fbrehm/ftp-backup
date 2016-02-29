@@ -15,6 +15,8 @@ import errno
 import stat
 import re
 
+from datetime import datetime
+
 from numbers import Number
 
 from collections import OrderedDict
@@ -35,7 +37,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.5.3'
+__version__ = '0.5.4'
 
 LOG = logging.getLogger(__name__)
 
@@ -547,8 +549,117 @@ class SFTPHandler(PbBaseHandler):
                 continue
             if re_backup_dirs.search(entry):
                 cur_backup_dirs.append(entry)
+        cur_backup_dirs.sort(key=str.lower)
 
         if self.verbose > 1:
             LOG.debug("Found backup directories to check:\n%s", pp(cur_backup_dirs))
+
+        cur_date = datetime.utcnow()
+        backup_dir_tpl = cur_date.strftime('%Y-%m-%d_%%02d')
+        LOG.debug("Backup directory template: %r", backup_dir_tpl)
+        cur_weekday = cur_date.timetuple().tm_wday
+
+        # Retrieving new backup directory
+        new_backup_dir = None
+        i = 0
+        found = False
+        while not found:
+            new_backup_dir = backup_dir_tpl % (i)
+            if not new_backup_dir in cur_backup_dirs:
+                found = True
+            i += 1
+        LOG.info("New backup directory: %r", new_backup_dir)
+        cur_backup_dirs.append(new_backup_dir)
+
+        type_mapping = {
+            'yearly': [],
+            'monthly': [],
+            'weekly': [],
+            'daily': [],
+            'other': [],
+        }
+
+        if cur_date.month == 1 and cur_date.day == 1:
+            if not new_backup_dir in type_mapping['yearly']:
+                type_mapping['yearly'].append(new_backup_dir)
+        if cur_date.day == 1:
+            if not new_backup_dir in type_mapping['monthly']:
+                type_mapping['monthly'].append(new_backup_dir)
+        if cur_weekday == 6:
+            # Sunday
+            if not new_backup_dir in type_mapping['weekly']:
+                type_mapping['weekly'].append(new_backup_dir)
+        if not new_backup_dir in type_mapping['daily']:
+            type_mapping['daily'].append(new_backup_dir)
+
+        self._map_dirs2types(type_mapping, cur_backup_dirs)
+        for key in type_mapping:
+            type_mapping[key].sort(key=str.lower)
+        if self.verbose > 2:
+            LOG.debug("Mapping of found directories to backup types:\n%s", pp(type_mapping))
+
+        for key in self.copies:
+            max_copies = self.copies[key]
+            cur_copies = len(type_mapping[key])
+            while cur_copies > max_copies:
+                type_mapping[key].pop(0)
+                cur_copies = len(type_mapping[key])
+        if self.verbose > 2:
+            LOG.debug("Directories to keep:\n%s", pp(type_mapping))
+
+        dirs_delete = []
+        for backup_dir in cur_backup_dirs:
+            keep = False
+            for key in type_mapping:
+                if backup_dir in type_mapping[key]:
+                    if self.verbose > 2:
+                        LOG.debug("Directory %r has to be kept.", backup_dir)
+                    keep = True
+                    continue
+            if not keep:
+                dirs_delete.append(backup_dir)
+        LOG.debug("Directories to remove:\n%s", pp(dirs_delete))
+
+    # -------------------------------------------------------------------------
+    def _map_dirs2types(self, type_mapping, backup_dirs):
+
+        re_backup_date = re.compile(r'^\s*(\d+)[_\-](\d+)[_\-](\d+)')
+
+        for backup_dir in backup_dirs:
+
+            match = re_backup_date.search(backup_dir)
+            if not match:
+                if not backup_dir in type_mapping['other']:
+                    type_mapping['other'].append(backup_dir)
+                continue
+
+            year = int(match.group(1))
+            month = int(match.group(2))
+            day = int(match.group(3))
+
+            dt = None
+            try:
+                dt = datetime(year, month, day)
+            except ValueError as e:
+                LOG.debug("Invalid date in backup directory %r: %s", backup_dir, str(e))
+                if not backup_dir in type_mapping['other']:
+                    type_mapping['other'].append(backup_dir)
+                continue
+            weekday = dt.timetuple().tm_wday
+            if dt.month == 1 and dt.day == 1:
+                if not backup_dir in type_mapping['yearly']:
+                    type_mapping['yearly'].append(backup_dir)
+            if dt.day == 1:
+                if not backup_dir in type_mapping['monthly']:
+                    type_mapping['monthly'].append(backup_dir)
+            if weekday == 6:
+                # Sunday
+                if not backup_dir in type_mapping['weekly']:
+                    type_mapping['weekly'].append(backup_dir)
+            if not backup_dir in type_mapping['daily']:
+                type_mapping['daily'].append(backup_dir)
+
+        if self.verbose > 3:
+            LOG.debug("Mapping of found directories to backup types:\n%s", pp(type_mapping))
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
