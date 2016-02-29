@@ -319,6 +319,7 @@ class BackupBySftpApp(PbCfgApp):
             LOG.info("Current main remote directory is now %r.", str(self.handler.remote_dir))
 
             self.handler.cleanup_old_backupdirs()
+            self.handler.do_backup()
 
         finally:
             self.handler.disconnect()

@@ -37,7 +37,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.5.5'
+__version__ = '0.6.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -173,6 +173,7 @@ class SFTPHandler(PbBaseHandler):
         self.sftp_client = None
         self._key_file = DEFAULT_SSH_KEY
         self._timeout = DEFAULT_SSH_TIMEOUT
+        self._new_backup_dir = None
 
         self._local_dir = DEFAULT_LOCAL_DIRECTORY
 
@@ -369,6 +370,22 @@ class SFTPHandler(PbBaseHandler):
             raise ValueError(msg)
         self._timeout = value
 
+    # -----------------------------------------------------------
+    @property
+    def new_backup_dir(self):
+        """The new backup directory."""
+        return self._new_backup_dir
+
+    @new_backup_dir.setter
+    def new_backup_dir(self, value):
+        if value is None:
+            self._new_backup_dir = None
+            return
+        if isinstance(value, PurePosixPath):
+            self._new_backup_dir = value
+            return
+        self._new_backup_dir = PurePosixPath(str(value))
+
     # -------------------------------------------------------------------------
     def as_dict(self, short=False):
         """
@@ -391,6 +408,7 @@ class SFTPHandler(PbBaseHandler):
         res['key_file'] = self.key_file
         res['local_dir'] = self.local_dir
         res['timeout'] = self.timeout
+        res['new_backup_dir'] = self.new_backup_dir
 
         return res
 
@@ -555,20 +573,11 @@ class SFTPHandler(PbBaseHandler):
             LOG.debug("Found backup directories to check:\n%s", pp(cur_backup_dirs))
 
         cur_date = datetime.utcnow()
-        backup_dir_tpl = cur_date.strftime('%Y-%m-%d_%%02d')
-        LOG.debug("Backup directory template: %r", backup_dir_tpl)
         cur_weekday = cur_date.timetuple().tm_wday
 
         # Retrieving new backup directory
-        new_backup_dir = None
-        i = 0
-        found = False
-        while not found:
-            new_backup_dir = backup_dir_tpl % (i)
-            if not new_backup_dir in cur_backup_dirs:
-                found = True
-            i += 1
-        LOG.info("New backup directory: %r", new_backup_dir)
+        self._get_new_backup_dir(cur_backup_dirs)
+        new_backup_dir = str(self.new_backup_dir)
         cur_backup_dirs.append(new_backup_dir)
 
         type_mapping = {
@@ -622,6 +631,38 @@ class SFTPHandler(PbBaseHandler):
 
         if dirs_delete:
             self.remove_recursive(*dirs_delete)
+
+    # -------------------------------------------------------------------------
+    def _get_new_backup_dir(self, cur_backup_dirs=None):
+        # Retrieving new backup directory
+
+        if cur_backup_dirs is None:
+            cur_backup_dirs = []
+            dlist = self.dir_list()
+            for entry in dlist:
+                entry_stat = dlist[entry]
+                if self.verbose > 2:
+                    LOG.debug("Checking entry %r ...", pp(entry))
+                if not stat.S_ISDIR(entry_stat.st_mode):
+                    if self.verbose > 2:
+                        LOG.debug("%r is not a directory.", entry)
+                    continue
+                cur_backup_dirs.append(entry)
+
+        cur_date = datetime.utcnow()
+        backup_dir_tpl = cur_date.strftime('%Y-%m-%d_%%02d')
+        LOG.debug("Backup directory template: %r", backup_dir_tpl)
+
+        new_backup_dir = None
+        i = 0
+        found = False
+        while not found:
+            new_backup_dir = backup_dir_tpl % (i)
+            if not new_backup_dir in cur_backup_dirs:
+                found = True
+            i += 1
+        self.new_backup_dir = new_backup_dir
+        LOG.info("New backup directory: %r", str(self.new_backup_dir))
 
     # -------------------------------------------------------------------------
     def _map_dirs2types(self, type_mapping, backup_dirs):
@@ -699,5 +740,11 @@ class SFTPHandler(PbBaseHandler):
             if not self.simulate:
                 self.sftp_client.remove(str(ipath))
 
+    # -------------------------------------------------------------------------
+    def do_backup(self):
+
+        if not self.new_backup_dir:
+            self._get_new_backup_dir(cur_backup_dirs)
+        new_backup_dir = str(self.new_backup_dir)
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
