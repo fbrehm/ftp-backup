@@ -23,7 +23,7 @@ from pb_base.common import to_str_or_bust as to_str
 
 from pb_base.object import PbBaseObject
 
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 LOG = logging.getLogger(__name__)
 
@@ -402,14 +402,14 @@ class DirEntry(PbBaseObject):
         elif isinstance(val, six.string_types) or isinstance(val, six.binary_type):
             v = to_str(val)
             pat_older = '%b %d %Y'
-            pat_newer = '%b %d %H:%M'
+            pat_newer = '%Y %b %d %H:%M'
             cur_year = datetime.utcnow().year
             try:
                 self._mtime = datetime.strptime(v, pat_older)
             except ValueError:
                 try:
-                    mt = datetime.strptime(v, pat_newer)
-                    self._mtime = datetime(cur_year, mt.month, mt.day, mt.hour, mt.minute)
+                    vn = "%d %s" % (cur_year, v)
+                    self._mtime = datetime.strptime(vn, pat_newer)
                 except ValueError:
                     msg = "Invalid mtime of the FTP entry %r." % (val)
                     raise ValueError(msg)

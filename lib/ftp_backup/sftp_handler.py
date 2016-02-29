@@ -35,7 +35,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.5.2'
+__version__ = '0.5.3'
 
 LOG = logging.getLogger(__name__)
 
