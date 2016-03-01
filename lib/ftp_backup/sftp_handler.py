@@ -14,6 +14,7 @@ import os
 import errno
 import stat
 import re
+import stat
 
 from datetime import datetime
 
@@ -37,7 +38,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.6.1'
+__version__ = '0.6.2'
 
 LOG = logging.getLogger(__name__)
 
@@ -746,5 +747,45 @@ class SFTPHandler(PbBaseHandler):
         if not self.new_backup_dir:
             self._get_new_backup_dir(cur_backup_dirs)
         new_backup_dir = str(self.new_backup_dir)
+
+        dir_mode = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+        LOG.info("Creating backup directory %r with permissions %04o.", new_backup_dir, dir_mode)
+        if not self.simulate:
+            self.sftp_client.mkdir(new_backup_dir, dir_mode)
+
+        LOG.debug("Changing to local directory %r ...", self.local_dir)
+        os.chdir(str(self.local_dir))
+
+        LOG.debug("Changing to remote directory %r ...", new_backup_dir)
+        if not self.simulate:
+            self.remote_dir = new_backup_dir
+            LOG.debug("Remote directory is now %r.", self.remote_dir)
+
+        local_files = self.local_dir.glob('*')
+        for local_file in sorted(local_files, key=lambda l: str(l).lower()):
+
+            if self.verbose > 1:
+                LOG.debug("Checking local file %r ...", local_file)
+            if not local_file.is_file():
+                if self.verbose > 1:
+                    LOG.debug("%r is not a file, don't backup it.", str(local_file))
+                continue
+
+            statinfo = local_file.stat()
+            size = statinfo.st_size
+            s = ''
+            if size != 1:
+                s = 's'
+            size_human = bytes2human(size, precision=1)
+
+            remote_file = local_file.name
+
+            LOG.info(
+                "Transfering file %r -> %r, size %d Byte%s (%s).",
+                str(local_file), remote_file, size, s, size_human)
+
+            if not self.simulate:
+                attr = self.sftp_client.put(
+                    str(local_file), remote_file, confirm=True)
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
