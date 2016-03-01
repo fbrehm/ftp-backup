@@ -38,7 +38,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.6.2'
+__version__ = '0.6.3'
 
 LOG = logging.getLogger(__name__)
 
@@ -773,6 +773,11 @@ class SFTPHandler(PbBaseHandler):
 
             statinfo = local_file.stat()
             size = statinfo.st_size
+            atime = statinfo.st_atime
+            mtime = statinfo.st_mtime
+            times = (atime, mtime)
+            atime_out = datetime.utcfromtimestamp(atime).isoformat(' ')
+            mtime_out = datetime.utcfromtimestamp(mtime).isoformat(' ')
             s = ''
             if size != 1:
                 s = 's'
@@ -787,5 +792,11 @@ class SFTPHandler(PbBaseHandler):
             if not self.simulate:
                 attr = self.sftp_client.put(
                     str(local_file), remote_file, confirm=True)
+
+            LOG.debug(
+                "Setting atime of %r to %r and mtime to %r.",
+                remote_file, atime_out, mtime_out)
+            if not self.simulate:
+                self.sftp_client.utime(remote_file, times)
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
