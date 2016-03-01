@@ -46,7 +46,7 @@ from ftp_backup.sftp_handler import DEFAULT_SSH_SERVER, DEFAULT_SSH_PORT
 from ftp_backup.sftp_handler import DEFAULT_SSH_USER, DEFAULT_REMOTE_DIR
 from ftp_backup.sftp_handler import DEFAULT_SSH_TIMEOUT, DEFAULT_SSH_KEY
 
-__version__ = '0.4.4'
+__version__ = '0.4.6'
 
 LOG = logging.getLogger(__name__)
 
@@ -357,10 +357,13 @@ class BackupBySftpApp(PbCfgApp):
                 self.handler.mkdir(subdir)
 
             self.handler.remote_dir = subdir
+            subdir = self.handler.remote_dir
             LOG.info("Current main remote directory is now %r.", str(self.handler.remote_dir))
 
             self.handler.cleanup_old_backupdirs()
             self.handler.do_backup()
+            self.handler.remote_dir = subdir
+            self.handler.show_disk_usage()
 
         finally:
             self.handler.disconnect()

@@ -26,6 +26,7 @@ from pathlib import PurePath, PurePosixPath, Path, PosixPath
 
 # Third party modules
 import paramiko
+import six
 
 # Own modules
 from pb_base.common import to_str_or_bust as to_str
@@ -38,7 +39,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.6.3'
+__version__ = '0.7.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -798,5 +799,96 @@ class SFTPHandler(PbBaseHandler):
                 remote_file, atime_out, mtime_out)
             if not self.simulate:
                 self.sftp_client.utime(remote_file, times)
+
+    # -------------------------------------------------------------------------
+    def disk_usage(self, item):
+        """
+        Performs a recursive determination of the disk usage of
+        the given remote directory item.
+        This item must be located in the current remote directory.
+        """
+
+        if not self.connected:
+            msg = "Could not detect disk usage of item %r, not connected." % (item)
+            raise SFTPHandlerError(msg)
+
+        total = 0
+        if six.PY2:
+            total = long(0)
+
+        if not item:
+            msg = "No item to detect disk usage given."
+            raise SFTPHandlerError(msg)
+        item = str(item)
+        if self.verbose > 3:
+            LOG.debug("Analyzing item %r", item)
+
+        try:
+            fstat = self.sftp_client.stat(item)
+        except FileNotFoundError:
+            LOG.warn("Item %r not found.", item)
+            return total
+
+        sz = 0
+        if six.PY2:
+            sz = long(fstat.st_size)
+        else:
+            sz = fstat.st_size
+
+        total += sz
+        if stat.S_ISDIR(fstat.st_mode):
+            if self.verbose > 2:
+                LOG.debug("Trying to detect disk usage of remote directory %r ...)", item)
+            for entry in self.sftp_client.listdir(item):
+                path = os.path.join(item, entry)
+                sz = self.disk_usage(path)
+                total += sz
+
+        return total
+
+    # -------------------------------------------------------------------------
+    def show_disk_usage(self, only_total=False):
+
+        if not self.connected:
+            msg = "Could not detect disk usage, not connected."
+            raise SFTPHandlerError(msg)
+
+        total = 0
+        if six.PY2:
+            total = long(0)
+
+        dlist = []
+        for entry in self.sftp_client.listdir():
+            dlist.append(entry)
+
+        total_s = 'Total'
+        max_len = len(total_s)
+        if not only_total:
+            for entry in dlist:
+                if len(entry) > max_len:
+                    max_len = len(entry)
+        max_len += 2
+
+        LOG.info("Current disk usages:")
+
+        for entry in sorted(dlist, key=str.lower):
+            sz = self.disk_usage(entry)
+            total += sz
+            if not only_total:
+                s = ''
+                if sz != 1:
+                    s = 's'
+                b_h = bytes2human(sz, precision=1)
+                (val, unit) = b_h.split(maxsplit=1)
+                b_h_s = "%6s %s" % (val, unit)
+                LOG.info("%-*r %13d Byte%s (%s)", max_len, entry, sz, s, b_h_s)
+
+        s = ''
+        if total != 1:
+            s = 's'
+        b_h = bytes2human(total, precision=1)
+        (val, unit) = b_h.split(maxsplit=1)
+        b_h_s = "%6s %s" % (val, unit)
+        LOG.info("%-*s %13d Byte%s (%s)", max_len, total_s + ':', total, s, b_h_s)
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
