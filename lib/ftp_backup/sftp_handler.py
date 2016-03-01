@@ -14,6 +14,9 @@ import os
 import errno
 import stat
 import re
+import stat
+
+from datetime import datetime
 
 from numbers import Number
 
@@ -23,6 +26,7 @@ from pathlib import PurePath, PurePosixPath, Path, PosixPath
 
 # Third party modules
 import paramiko
+import six
 
 # Own modules
 from pb_base.common import to_str_or_bust as to_str
@@ -35,7 +39,7 @@ from ftp_backup import DEFAULT_LOCAL_DIRECTORY
 from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-__version__ = '0.5.3'
+__version__ = '0.7.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -171,6 +175,7 @@ class SFTPHandler(PbBaseHandler):
         self.sftp_client = None
         self._key_file = DEFAULT_SSH_KEY
         self._timeout = DEFAULT_SSH_TIMEOUT
+        self._new_backup_dir = None
 
         self._local_dir = DEFAULT_LOCAL_DIRECTORY
 
@@ -367,6 +372,22 @@ class SFTPHandler(PbBaseHandler):
             raise ValueError(msg)
         self._timeout = value
 
+    # -----------------------------------------------------------
+    @property
+    def new_backup_dir(self):
+        """The new backup directory."""
+        return self._new_backup_dir
+
+    @new_backup_dir.setter
+    def new_backup_dir(self, value):
+        if value is None:
+            self._new_backup_dir = None
+            return
+        if isinstance(value, PurePosixPath):
+            self._new_backup_dir = value
+            return
+        self._new_backup_dir = PurePosixPath(str(value))
+
     # -------------------------------------------------------------------------
     def as_dict(self, short=False):
         """
@@ -389,6 +410,7 @@ class SFTPHandler(PbBaseHandler):
         res['key_file'] = self.key_file
         res['local_dir'] = self.local_dir
         res['timeout'] = self.timeout
+        res['new_backup_dir'] = self.new_backup_dir
 
         return res
 
@@ -547,8 +569,326 @@ class SFTPHandler(PbBaseHandler):
                 continue
             if re_backup_dirs.search(entry):
                 cur_backup_dirs.append(entry)
+        cur_backup_dirs.sort(key=str.lower)
 
         if self.verbose > 1:
             LOG.debug("Found backup directories to check:\n%s", pp(cur_backup_dirs))
+
+        cur_date = datetime.utcnow()
+        cur_weekday = cur_date.timetuple().tm_wday
+
+        # Retrieving new backup directory
+        self._get_new_backup_dir(cur_backup_dirs)
+        new_backup_dir = str(self.new_backup_dir)
+        cur_backup_dirs.append(new_backup_dir)
+
+        type_mapping = {
+            'yearly': [],
+            'monthly': [],
+            'weekly': [],
+            'daily': [],
+            'other': [],
+        }
+
+        if cur_date.month == 1 and cur_date.day == 1:
+            if not new_backup_dir in type_mapping['yearly']:
+                type_mapping['yearly'].append(new_backup_dir)
+        if cur_date.day == 1:
+            if not new_backup_dir in type_mapping['monthly']:
+                type_mapping['monthly'].append(new_backup_dir)
+        if cur_weekday == 6:
+            # Sunday
+            if not new_backup_dir in type_mapping['weekly']:
+                type_mapping['weekly'].append(new_backup_dir)
+        if not new_backup_dir in type_mapping['daily']:
+            type_mapping['daily'].append(new_backup_dir)
+
+        self._map_dirs2types(type_mapping, cur_backup_dirs)
+        for key in type_mapping:
+            type_mapping[key].sort(key=str.lower)
+        if self.verbose > 2:
+            LOG.debug("Mapping of found directories to backup types:\n%s", pp(type_mapping))
+
+        for key in self.copies:
+            max_copies = self.copies[key]
+            cur_copies = len(type_mapping[key])
+            while cur_copies > max_copies:
+                type_mapping[key].pop(0)
+                cur_copies = len(type_mapping[key])
+        if self.verbose > 2:
+            LOG.debug("Directories to keep:\n%s", pp(type_mapping))
+
+        dirs_delete = []
+        for backup_dir in cur_backup_dirs:
+            keep = False
+            for key in type_mapping:
+                if backup_dir in type_mapping[key]:
+                    if self.verbose > 2:
+                        LOG.debug("Directory %r has to be kept.", backup_dir)
+                    keep = True
+                    continue
+            if not keep:
+                dirs_delete.append(backup_dir)
+        LOG.debug("Directories to remove:\n%s", pp(dirs_delete))
+
+        if dirs_delete:
+            self.remove_recursive(*dirs_delete)
+
+    # -------------------------------------------------------------------------
+    def _get_new_backup_dir(self, cur_backup_dirs=None):
+        # Retrieving new backup directory
+
+        if cur_backup_dirs is None:
+            cur_backup_dirs = []
+            dlist = self.dir_list()
+            for entry in dlist:
+                entry_stat = dlist[entry]
+                if self.verbose > 2:
+                    LOG.debug("Checking entry %r ...", pp(entry))
+                if not stat.S_ISDIR(entry_stat.st_mode):
+                    if self.verbose > 2:
+                        LOG.debug("%r is not a directory.", entry)
+                    continue
+                cur_backup_dirs.append(entry)
+
+        cur_date = datetime.utcnow()
+        backup_dir_tpl = cur_date.strftime('%Y-%m-%d_%%02d')
+        LOG.debug("Backup directory template: %r", backup_dir_tpl)
+
+        new_backup_dir = None
+        i = 0
+        found = False
+        while not found:
+            new_backup_dir = backup_dir_tpl % (i)
+            if not new_backup_dir in cur_backup_dirs:
+                found = True
+            i += 1
+        self.new_backup_dir = new_backup_dir
+        LOG.info("New backup directory: %r", str(self.new_backup_dir))
+
+    # -------------------------------------------------------------------------
+    def _map_dirs2types(self, type_mapping, backup_dirs):
+
+        re_backup_date = re.compile(r'^\s*(\d+)[_\-](\d+)[_\-](\d+)')
+
+        for backup_dir in backup_dirs:
+
+            match = re_backup_date.search(backup_dir)
+            if not match:
+                if not backup_dir in type_mapping['other']:
+                    type_mapping['other'].append(backup_dir)
+                continue
+
+            year = int(match.group(1))
+            month = int(match.group(2))
+            day = int(match.group(3))
+
+            dt = None
+            try:
+                dt = datetime(year, month, day)
+            except ValueError as e:
+                LOG.debug("Invalid date in backup directory %r: %s", backup_dir, str(e))
+                if not backup_dir in type_mapping['other']:
+                    type_mapping['other'].append(backup_dir)
+                continue
+            weekday = dt.timetuple().tm_wday
+            if dt.month == 1 and dt.day == 1:
+                if not backup_dir in type_mapping['yearly']:
+                    type_mapping['yearly'].append(backup_dir)
+            if dt.day == 1:
+                if not backup_dir in type_mapping['monthly']:
+                    type_mapping['monthly'].append(backup_dir)
+            if weekday == 6:
+                # Sunday
+                if not backup_dir in type_mapping['weekly']:
+                    type_mapping['weekly'].append(backup_dir)
+            if not backup_dir in type_mapping['daily']:
+                type_mapping['daily'].append(backup_dir)
+
+        if self.verbose > 3:
+            LOG.debug("Mapping of found directories to backup types:\n%s", pp(type_mapping))
+
+    # -------------------------------------------------------------------------
+    def remove_recursive(self, *items):
+
+        if not items:
+            LOG.warning("Called remove_recursive() without items to remove.")
+            return
+
+        if not self.connected:
+            raise SFTPHandlerError("Cannot remove %r, not connected." % (items))
+
+        for item in items:
+
+            ipath = item
+            if not isinstance(item, PurePosixPath):
+                ipath = PurePosixPath(str(item))
+            if str(ipath) == '.' or str(ipath) == '..':
+                LOG.warning("Cannot remove special directory %r.", str(ipath))
+                continue
+
+            if self.is_dir(ipath):
+                LOG.info("Removing recursive %r ...", str(ipath))
+                dlist = self.sftp_client.listdir(str(ipath))
+                for entry in dlist:
+                    entry_path = PurePosixPath(os.path.join(str(ipath), entry))
+                    self.remove_recursive(entry_path)
+                LOG.info("Removing directory %r ...", str(ipath))
+                if not self.simulate:
+                    self.sftp_client.rmdir(str(ipath))
+                continue
+
+            LOG.info("Removing file %r ...", str(ipath))
+            if not self.simulate:
+                self.sftp_client.remove(str(ipath))
+
+    # -------------------------------------------------------------------------
+    def do_backup(self):
+
+        if not self.new_backup_dir:
+            self._get_new_backup_dir(cur_backup_dirs)
+        new_backup_dir = str(self.new_backup_dir)
+
+        dir_mode = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+        LOG.info("Creating backup directory %r with permissions %04o.", new_backup_dir, dir_mode)
+        if not self.simulate:
+            self.sftp_client.mkdir(new_backup_dir, dir_mode)
+
+        LOG.debug("Changing to local directory %r ...", self.local_dir)
+        os.chdir(str(self.local_dir))
+
+        LOG.debug("Changing to remote directory %r ...", new_backup_dir)
+        if not self.simulate:
+            self.remote_dir = new_backup_dir
+            LOG.debug("Remote directory is now %r.", self.remote_dir)
+
+        local_files = self.local_dir.glob('*')
+        for local_file in sorted(local_files, key=lambda l: str(l).lower()):
+
+            if self.verbose > 1:
+                LOG.debug("Checking local file %r ...", local_file)
+            if not local_file.is_file():
+                if self.verbose > 1:
+                    LOG.debug("%r is not a file, don't backup it.", str(local_file))
+                continue
+
+            statinfo = local_file.stat()
+            size = statinfo.st_size
+            atime = statinfo.st_atime
+            mtime = statinfo.st_mtime
+            times = (atime, mtime)
+            atime_out = datetime.utcfromtimestamp(atime).isoformat(' ')
+            mtime_out = datetime.utcfromtimestamp(mtime).isoformat(' ')
+            s = ''
+            if size != 1:
+                s = 's'
+            size_human = bytes2human(size, precision=1)
+
+            remote_file = local_file.name
+
+            LOG.info(
+                "Transfering file %r -> %r, size %d Byte%s (%s).",
+                str(local_file), remote_file, size, s, size_human)
+
+            if not self.simulate:
+                attr = self.sftp_client.put(
+                    str(local_file), remote_file, confirm=True)
+
+            LOG.debug(
+                "Setting atime of %r to %r and mtime to %r.",
+                remote_file, atime_out, mtime_out)
+            if not self.simulate:
+                self.sftp_client.utime(remote_file, times)
+
+    # -------------------------------------------------------------------------
+    def disk_usage(self, item):
+        """
+        Performs a recursive determination of the disk usage of
+        the given remote directory item.
+        This item must be located in the current remote directory.
+        """
+
+        if not self.connected:
+            msg = "Could not detect disk usage of item %r, not connected." % (item)
+            raise SFTPHandlerError(msg)
+
+        total = 0
+        if six.PY2:
+            total = long(0)
+
+        if not item:
+            msg = "No item to detect disk usage given."
+            raise SFTPHandlerError(msg)
+        item = str(item)
+        if self.verbose > 3:
+            LOG.debug("Analyzing item %r", item)
+
+        try:
+            fstat = self.sftp_client.stat(item)
+        except FileNotFoundError:
+            LOG.warn("Item %r not found.", item)
+            return total
+
+        sz = 0
+        if six.PY2:
+            sz = long(fstat.st_size)
+        else:
+            sz = fstat.st_size
+
+        total += sz
+        if stat.S_ISDIR(fstat.st_mode):
+            if self.verbose > 2:
+                LOG.debug("Trying to detect disk usage of remote directory %r ...)", item)
+            for entry in self.sftp_client.listdir(item):
+                path = os.path.join(item, entry)
+                sz = self.disk_usage(path)
+                total += sz
+
+        return total
+
+    # -------------------------------------------------------------------------
+    def show_disk_usage(self, only_total=False):
+
+        if not self.connected:
+            msg = "Could not detect disk usage, not connected."
+            raise SFTPHandlerError(msg)
+
+        total = 0
+        if six.PY2:
+            total = long(0)
+
+        dlist = []
+        for entry in self.sftp_client.listdir():
+            dlist.append(entry)
+
+        total_s = 'Total'
+        max_len = len(total_s)
+        if not only_total:
+            for entry in dlist:
+                if len(entry) > max_len:
+                    max_len = len(entry)
+        max_len += 2
+
+        LOG.info("Current disk usages:")
+
+        for entry in sorted(dlist, key=str.lower):
+            sz = self.disk_usage(entry)
+            total += sz
+            if not only_total:
+                s = ''
+                if sz != 1:
+                    s = 's'
+                b_h = bytes2human(sz, precision=1)
+                (val, unit) = b_h.split(maxsplit=1)
+                b_h_s = "%6s %s" % (val, unit)
+                LOG.info("%-*r %13d Byte%s (%s)", max_len, entry, sz, s, b_h_s)
+
+        s = ''
+        if total != 1:
+            s = 's'
+        b_h = bytes2human(total, precision=1)
+        (val, unit) = b_h.split(maxsplit=1)
+        b_h_s = "%6s %s" % (val, unit)
+        LOG.info("%-*s %13d Byte%s (%s)", max_len, total_s + ':', total, s, b_h_s)
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

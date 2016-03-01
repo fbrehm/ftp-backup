@@ -27,18 +27,19 @@ import six
 from pb_logging.colored import ColoredFormatter
 
 from pb_base.common import to_bool, pp, bytes2human
-from pb_base.app import PbApplicationError
 
 from pb_base.handler import PbBaseHandlerError
 
-from pb_base.cfg_app import PbCfgAppError
 from pb_base.cfg_app import PbCfgApp
 
 import ftp_backup
+from ftp_backup import DEFAULT_LOCAL_DIRECTORY
+from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
+from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.4.0'
+__version__ = '0.4.2'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_PORT = 21
@@ -50,12 +51,12 @@ DEFAULT_FTP_TZ = 'UTC'
 
 DEFAULT_FTP_TIMEOUT = 60
 
-DEFAULT_LOCAL_DIRECTORY = os.sep + os.path.join('var', 'backup')
-
-DEFAULT_COPIES_YEARLY = 2
-DEFAULT_COPIES_MONTHLY = 2
-DEFAULT_COPIES_WEEKLY = 2
-DEFAULT_COPIES_DAILY = 2
+APP_VERSION = ftp_backup.__version__
+try:
+    import ftp_backup.local_version
+    APP_VERSION = ftp_backup.local_version.__version__
+except ImportError:
+    pass
 
 
 # =============================================================================
@@ -106,8 +107,8 @@ class BackupByFtpApp(PbCfgApp):
         super(BackupByFtpApp, self).__init__(
             appname=appname,
             verbose=verbose,
-            version=ftp_backup.__version__,
-            description = textwrap.dedent(description),
+            version=APP_VERSION,
+            description=textwrap.dedent(description),
             cfg_dir='ftp-backup',
             hide_default_config=True,
             need_config_file=False,
@@ -132,8 +133,8 @@ class BackupByFtpApp(PbCfgApp):
         super(BackupByFtpApp, self).init_arg_parser()
 
         h = "Local directory for the files to backup (default: %r)." % (DEFAULT_LOCAL_DIRECTORY)
-        self.arg_parser.add_argument('-D', '--dir', '--local-dir', metavar='DIR',
-            dest='local_dir', help = h)
+        self.arg_parser.add_argument(
+            '-D', '--dir', '--local-dir', metavar='DIR', dest='local_dir', help=h)
 
         h = "Simulation mode, no modifying actions are done."
         self.arg_parser.add_argument('-t', '--test', action='store_true', help=h)
@@ -150,7 +151,7 @@ class BackupByFtpApp(PbCfgApp):
         h = "Use TLS for communication with the FTP server (default: False)."
         ftp_group.add_argument('--tls', action='store_true', help=h)
 
-        h = 'The username on the FTP server (default: %r).' % (DEFAULT_FTP_PWD)
+        h = 'The username on the FTP server (default: %r).' % (DEFAULT_FTP_USER)
         ftp_group.add_argument('--user', metavar='USER', help=h)
 
         h = 'The user password on the FTP server (default: %r).' % (DEFAULT_FTP_PWD)
@@ -167,16 +168,20 @@ class BackupByFtpApp(PbCfgApp):
 
         copies_group = self.arg_parser.add_argument_group('Backup copies to store')
 
-        copies_group.add_argument('--copies-yearly', type=int, metavar = 'NR',
+        copies_group.add_argument(
+            '--copies-yearly', type=int, metavar='NR',
             help='Yearly (default: %d).' % (DEFAULT_COPIES_YEARLY))
 
-        copies_group.add_argument('--copies-monthly', type=int, metavar = 'NR',
+        copies_group.add_argument(
+            '--copies-monthly', type=int, metavar='NR',
             help='Monthly (default: %d).' % (DEFAULT_COPIES_MONTHLY))
 
-        copies_group.add_argument('--copies-weekly', type=int, metavar = 'NR',
+        copies_group.add_argument(
+            '--copies-weekly', type=int, metavar='NR',
             help='Weekly (default: %d).' % (DEFAULT_COPIES_WEEKLY))
 
-        copies_group.add_argument('--copies-daily', type=int, metavar = 'NR',
+        copies_group.add_argument(
+            '--copies-daily', type=int, metavar='NR',
             help='Daily (default: %d).' % (DEFAULT_COPIES_DAILY))
 
     # -------------------------------------------------------------------------
@@ -262,7 +267,8 @@ class BackupByFtpApp(PbCfgApp):
                     try:
                         v = int(self.cfg[section]['yearly'])
                     except ValueError as e:
-                        msg = int_msg_tpl % ('Copies', 'yearly', self.cfg[section]['yearly'], str(e))
+                        msg = int_msg_tpl % (
+                            'Copies', 'yearly', self.cfg[section]['yearly'], str(e))
                     else:
                         self.copies['yearly'] = v
 
@@ -271,7 +277,8 @@ class BackupByFtpApp(PbCfgApp):
                     try:
                         v = int(self.cfg[section]['monthly'])
                     except ValueError as e:
-                        msg = int_msg_tpl % ('Copies', 'monthly', self.cfg[section]['monthly'], str(e))
+                        msg = int_msg_tpl % (
+                            'Copies', 'monthly', self.cfg[section]['monthly'], str(e))
                     else:
                         self.copies['monthly'] = v
 
@@ -280,7 +287,8 @@ class BackupByFtpApp(PbCfgApp):
                     try:
                         v = int(self.cfg[section]['weekly'])
                     except ValueError as e:
-                        msg = int_msg_tpl % ('Copies', 'weekly', self.cfg[section]['weekly'], str(e))
+                        msg = int_msg_tpl % (
+                            'Copies', 'weekly', self.cfg[section]['weekly'], str(e))
                     else:
                         self.copies['weekly'] = v
 
@@ -495,7 +503,8 @@ class BackupByFtpApp(PbCfgApp):
                     s = 's'
                 size_human = bytes2human(size, precision=1)
                 remote_file = re_whitespace.sub('_', os.path.basename(local_file))
-                LOG.info("Transfering file %r -> %r, size %d Byte%s (%s).",
+                LOG.info(
+                    "Transfering file %r -> %r, size %d Byte%s (%s).",
                     local_file, remote_file, size, s, size_human)
                 if not self.simulate:
                     cmd = 'STOR %s' % (remote_file)
