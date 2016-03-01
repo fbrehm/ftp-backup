@@ -190,6 +190,47 @@ class BackupBySftpApp(PbCfgApp):
             self.handler.copies['daily'] = self.args.copies_daily
 
     # -------------------------------------------------------------------------
+    def init_logging(self):
+        """
+        Initialize the logger object.
+        It creates a colored loghandler with all output to STDERR.
+        Maybe overridden in descendant classes.
+
+        @return: None
+        """
+
+        root_log = logging.getLogger()
+        root_log.setLevel(logging.INFO)
+        if self.verbose:
+            root_log.setLevel(logging.DEBUG)
+
+        # create formatter
+        format_str = '[%(asctime)s]: ' + self.appname + ': '
+        if self.verbose:
+            if self.verbose > 1:
+                format_str += '%(name)s(%(lineno)d) %(funcName)s() '
+            else:
+                format_str += '%(name)s '
+        format_str += '%(levelname)s - %(message)s'
+        formatter = None
+        if self.terminal_has_colors:
+            formatter = ColoredFormatter(format_str)
+        else:
+            formatter = logging.Formatter(format_str)
+
+        # create log handler for console output
+        lh_console = logging.StreamHandler(sys.stderr)
+        if self.verbose:
+            lh_console.setLevel(logging.DEBUG)
+        else:
+            lh_console.setLevel(logging.INFO)
+        lh_console.setFormatter(formatter)
+
+        root_log.addHandler(lh_console)
+
+        return
+
+    # -------------------------------------------------------------------------
     def perform_config(self):
 
         super(BackupBySftpApp, self).perform_config()
