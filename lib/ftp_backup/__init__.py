@@ -3,7 +3,7 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2015 by Frank Brehm, Berlin
+@copyright: © 2010 - 2025 by Frank Brehm, Berlin
 @summary: All modules for the FTP-backup applications
 """
 
@@ -12,9 +12,9 @@ import os
 from pathlib import PosixPath
 
 __author__ = 'Frank Brehm <frank@brehm-online.com>'
-__copyright__ = '(C) 2010 - 2015 by Frank Brehm, Berlin'
+__copyright__ = '(C) 2010 - 2025 by Frank Brehm, Berlin'
 __contact__ = 'frank@brehm-online.com'
-__version__ = '0.4.1'
+__version__ = '0.5.0'
 __license__ = 'LGPLv3+'
 
 DEFAULT_LOCAL_DIRECTORY = PosixPath(os.sep + os.path.join('var', 'backup'))
@@ -32,4 +32,4 @@ if __name__ == "__main__":
 
 # =============================================================================
 
-# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 list

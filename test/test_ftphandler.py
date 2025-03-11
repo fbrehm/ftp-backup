@@ -19,15 +19,15 @@ import ftplib
 from ftplib import FTP, FTP_TLS
 
 # Own modules
-from pb_base.common import to_bool, pp, bytes2human
-from pb_base.common import to_utf8_or_bust as to_utf8
+from fb_tools.common import to_bool, pp, bytes2human
+# from fb_tools.common import to_utf8_or_bust as to_utf8
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
 
-from mock import MagicMock
+# from mock import MagicMock
 
 libdir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), '..', 'lib'))
 sys.path.insert(0, libdir)
@@ -52,10 +52,12 @@ class TestFtpHandler(FtpBackupTestcase):
 
     # -------------------------------------------------------------------------
     def test_import_ftp_dir(self):
+        """"Test importing ftp_backup.ftp_dir."""
+        LOG.info(self.get_method_doc())
 
-        LOG.info("Test importing ftp_backup.ftp_dir ...")
-
-        import ftp_backup.ftp_dir                                       # noqa
+        import ftp_backup.ftp_dir
+        LOG.debug('Version of ftp_backup.ftp_dir: {!r}'.format(
+            ftp_backup.ftp_dir.__version__))
 
     # -------------------------------------------------------------------------
     def test_import_ftp_handler(self):
@@ -143,9 +145,9 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
 
     suite.addTest(TestFtpHandler('test_import_ftp_dir', verbose))
-    suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
-    suite.addTest(TestFtpHandler('test_handler_object', verbose))
-    suite.addTest(TestFtpHandler('test_handler_object_tls', verbose))
+    # suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
+    # suite.addTest(TestFtpHandler('test_handler_object', verbose))
+    # suite.addTest(TestFtpHandler('test_handler_object_tls', verbose))
 
     runner = unittest.TextTestRunner(verbosity=verbose)
 

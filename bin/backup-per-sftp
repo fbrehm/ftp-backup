@@ -1,51 +1,66 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+@summary: Script for backing up a directory via SFTP (SCP) to another server
+
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2015 by Frank Brehm, Berlin
+@copyright: © 2010 - 2025 by Frank Brehm, Berlin
 @license: GPL3
-@summary: Script for backing up a directory via SFTP (SCP) to another server
 """
+from __future__ import print_function
 
 # Standard modules
+import locale
 import sys
-import os
-import logging
-import re
+
+try:
+    from pathlib import Path
+except ImportError:
+    from pathlib2 import Path
+
+__exp_py_version_major__ = 3
+__min_py_version_minor__ = 6
+
+if sys.version_info[0] != __exp_py_version_major__:
+    print('This script is intended to use with Python {}.'.format(
+        __exp_py_version_major__), file=sys.stderr)
+    print('You are using Python: {0}.{1}.{2}-{3}-{4}.'.format(
+        *sys.version_info) + '\n', file=sys.stderr)
+    sys.exit(1)
+
+if sys.version_info[1] < __min_py_version_minor__:
+    print('A minimal Python version of {maj}.{min} is necessary to execute this script.'.format(
+        maj=__exp_py_version_major__, min=__min_py_version_minor__), file=sys.stderr)
+    print('You are using Python: {0}.{1}.{2}-{3}-{4}.'.format(
+        *sys.version_info) + '\n', file=sys.stderr)
+    sys.exit(1)
+
+my_path = Path(__file__)
+my_real_path = my_path.resolve()
+bin_path = my_real_path.parent
+base_dir = bin_path.parent
+lib_dir = base_dir.joinpath('lib')
+module_dir = lib_dir.joinpath('ftp_backup')
 
 # own modules:
-cur_dir = os.getcwd()
-base_dir = cur_dir
-
-appname = 'backup-per-sftp'
-if sys.argv[0] != '' and sys.argv[0] != '-c':
-    appname = os.path.basename(sys.argv[0])
-    appname = re.sub(r'\.py$', '', appname, re.IGNORECASE)
-    cur_dir = os.path.dirname(sys.argv[0])
-if os.path.exists(os.path.join(cur_dir, '..', 'lib')):
-    libdir = os.path.abspath(os.path.join(cur_dir, '..', 'lib'))
-    if os.path.exists(os.path.join(libdir, 'ftp_backup')):
-        moduledir = os.path.join(libdir, 'ftp_backup')
-        if os.path.exists(os.path.join(moduledir, '__init__.py')):
-            sys.path.insert(0, libdir)
-
-from pb_base.common import pp
-
-# print("Appname: %r." % appname)
-
-#LOG = logging.getLogger(appname)
-
 from ftp_backup.by_sftp_app import BackupBySftpApp
 
-app = BackupBySftpApp(appname)
+__author__ = 'Frank Brehm <frank@brehm-online.com>'
+__copyright__ = '(C) 2025 by Frank Brehm, Berlin'
+
+appname = my_path.name
+
+locale.setlocale(locale.LC_ALL, '')
+
+
+app = BackupBySftpApp(appname=appname, base_dir=base_dir)
+app.initialized = True
 
 if app.verbose > 2:
-    print("\n%s-Application object:\n%s\n" % (app.__class__.__name__, app))
+    print('{c}-Object:\n{a}'.format(c=app.__class__.__name__, a=app), file=sys.stderr)
 
 app()
-
-del app
 
 sys.exit(0)
 

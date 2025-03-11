@@ -3,27 +3,28 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2015 by Frank Brehm, Berlin
+@copyright: © 2010 - 2025 by Frank Brehm, Berlin
 @license: GPL3
 @summary: Module for classes for listings of FTP directories
 """
 
 # Standard modules
+from datetime import datetime
 import logging
 import re
-from datetime import datetime
 
 # Third party modules
 import six
 
 # Own modules
 
-from pb_base.common import pp
-from pb_base.common import to_str_or_bust as to_str
+from fb_tools.common import pp
+from fb_tools.common import to_str
 
-from pb_base.object import PbBaseObject
+from fb_tools.obj import FbGenericBaseObject
+from fb_tools.obj import FbBaseObject
 
-__version__ = '0.2.5'
+__version__ = '0.3.0'
 
 LOG = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ STAT_ISDIR = 0o1000
 
 
 # =============================================================================
-class EntryPermissions(object):
+class EntryPermissions(FbGenericBaseObject):
 
     pat_triple = r'([-r])([-w])([-x])'
     pat_from_str = r'^\s*([-d])' + pat_triple + pat_triple + pat_triple + r'\s*$'
@@ -92,7 +93,7 @@ class EntryPermissions(object):
     # -------------------------------------------------------------------------
     @classmethod
     def to_int(cls, permission):
-
+        """Typecast a permission string into an integer value."""
         perm = 0
         v = to_str(permission)
         match = cls.re_from_str.search(v)
@@ -139,12 +140,13 @@ class EntryPermissions(object):
 
     # -------------------------------------------------------------------------
     def __repr__(self):
+        """Typecast into a string for reproduction."""
         out = "<%s(permission=%r)>" % (self.__class__.__name__,  self.permission)
         return out
 
     # -------------------------------------------------------------------------
     def __str__(self):
-
+        """Typecast into a prmission string."""
         out = ''
 
         if self.permission & STAT_ISDIR:
@@ -261,7 +263,7 @@ class EntryPermissions(object):
 
 
 # =============================================================================
-class DirEntry(PbBaseObject):
+class DirEntry(FbBaseObject):
 
     # drwx---r-x   2 b082473  cust         8192 Jan  1  2014 2014-01-01_00
     # drwx---r-x   2 b082473  cust         8192 May  1 08:20 2015-05-01_00
@@ -271,8 +273,8 @@ class DirEntry(PbBaseObject):
 
     def __init__(
         self, name=None, perms=None, num_hardlinks=None, user=None, group=None,
-            size=None, mtime=None, appname=None, verbose=0, initialized=False):
-
+            size=None, mtime=None, appname=None, base_dir=None, verbose=0, initialized=False):
+        """Initialise the DirEntry object."""
         self._name = None
         self._perms = EntryPermissions(0)
         self._num_hardlinks = None
@@ -323,7 +325,7 @@ class DirEntry(PbBaseObject):
         if isinstance(val, six.string_types) or isinstance(val, six.binary_type):
             self._name = to_str(val)
         else:
-            msg = "Invalid FTP entry name %r." % (val)
+            msg = "Invalid FTP entry name {!r}.".format(val)
             raise ValueError(msg)
 
     # -----------------------------------------------------------
@@ -344,7 +346,7 @@ class DirEntry(PbBaseObject):
     def num_hardlinks(self, val):
         v = int(val)
         if v < 0:
-            msg = "Invalid number of hardlinks %r." % (val)
+            msg = "Invalid number of hardlinks {!r}.".format(val)
             raise ValueError(msg)
         self._num_hardlinks = v
 
@@ -358,7 +360,7 @@ class DirEntry(PbBaseObject):
         if isinstance(val, six.string_types) or isinstance(val, six.binary_type):
             self._user = to_str(val)
         else:
-            msg = "Invalid FTP user name %r." % (val)
+            msg = "Invalid FTP user name {!r}.".format(val)
             raise ValueError(msg)
 
     # -----------------------------------------------------------
@@ -371,7 +373,7 @@ class DirEntry(PbBaseObject):
         if isinstance(val, six.string_types) or isinstance(val, six.binary_type):
             self._group = to_str(val)
         else:
-            msg = "Invalid FTP group name %r." % (val)
+            msg = "Invalid FTP group name {!r}.".format(val)
             raise ValueError(msg)
 
     # -----------------------------------------------------------
@@ -386,7 +388,7 @@ class DirEntry(PbBaseObject):
         else:
             v = int(val)
         if v < 0:
-            msg = "Invalid size of the FTP entry %r." % (val)
+            msg = "Invalid size of the FTP entry {!r}.".format(val)
             raise ValueError(msg)
         self._size = v
 
@@ -411,10 +413,10 @@ class DirEntry(PbBaseObject):
                     vn = "%d %s" % (cur_year, v)
                     self._mtime = datetime.strptime(vn, pat_newer)
                 except ValueError:
-                    msg = "Invalid mtime of the FTP entry %r." % (val)
+                    msg = "Invalid mtime of the FTP entry {!r}.".format(val)
                     raise ValueError(msg)
         else:
-            msg = "Invalid mtime of the FTP entry %r." % (val)
+            msg = "Invalid mtime of the FTP entry {!r}.".format(val)
             raise ValueError(msg)
 
     # -------------------------------------------------------------------------
