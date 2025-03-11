@@ -24,26 +24,26 @@ from fb_tools.common import to_str
 from fb_tools.obj import FbGenericBaseObject
 from fb_tools.obj import FbBaseObject
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 LOG = logging.getLogger(__name__)
 
 # Permission Constants
 
 # User permissions
-STAT_RUSR = 0o1
+STAT_XUSR = 0o1
 STAT_WUSR = 0o2
-STAT_XUSR = 0o4
+STAT_RUSR = 0o4
 
 # Group permisions
-STAT_RGRP = 0o10
+STAT_XGRP = 0o10
 STAT_WGRP = 0o20
-STAT_XGRP = 0o40
+STAT_RGRP = 0o40
 
 # Permissions for others
-STAT_ROTH = 0o100
+STAT_XOTH = 0o100
 STAT_WOTH = 0o200
-STAT_XOTH = 0o400
+STAT_ROTH = 0o400
 
 # Is a directory
 STAT_ISDIR = 0o1000
@@ -101,11 +101,11 @@ class EntryPermissions(FbGenericBaseObject):
             if match.group(1) != '-':
                 perm |= STAT_ISDIR
             if match.group(2) != '-':
-                perm |= STAT_RUSR
+                perm |= STAT_ROTH
             if match.group(3) != '-':
-                perm |= STAT_WUSR
+                perm |= STAT_WOTH
             if match.group(4) != '-':
-                perm |= STAT_XUSR
+                perm |= STAT_XOTH
             if match.group(5) != '-':
                 perm |= STAT_RGRP
             if match.group(6) != '-':
@@ -113,11 +113,11 @@ class EntryPermissions(FbGenericBaseObject):
             if match.group(7) != '-':
                 perm |= STAT_XGRP
             if match.group(8) != '-':
-                perm |= STAT_ROTH
+                perm |= STAT_RUSR
             if match.group(9) != '-':
-                perm |= STAT_WOTH
+                perm |= STAT_WUSR
             if match.group(10) != '-':
-                perm |= STAT_XOTH
+                perm |= STAT_XUSR
             return perm
 
         match = cls.re_dec.search(v)
@@ -154,17 +154,17 @@ class EntryPermissions(FbGenericBaseObject):
         else:
             out += '-'
 
-        if self.permission & STAT_RUSR:
+        if self.permission & STAT_ROTH:
             out += 'r'
         else:
             out += '-'
 
-        if self.permission & STAT_WUSR:
+        if self.permission & STAT_WOTH:
             out += 'w'
         else:
             out += '-'
 
-        if self.permission & STAT_XUSR:
+        if self.permission & STAT_XOTH:
             out += 'x'
         else:
             out += '-'
@@ -184,17 +184,17 @@ class EntryPermissions(FbGenericBaseObject):
         else:
             out += '-'
 
-        if self.permission & STAT_ROTH:
+        if self.permission & STAT_RUSR:
             out += 'r'
         else:
             out += '-'
 
-        if self.permission & STAT_WOTH:
+        if self.permission & STAT_WUSR:
             out += 'w'
         else:
             out += '-'
 
-        if self.permission & STAT_XOTH:
+        if self.permission & STAT_XUSR:
             out += 'x'
         else:
             out += '-'
@@ -288,6 +288,7 @@ class DirEntry(FbBaseObject):
         super(DirEntry, self).__init__(
             appname=appname,
             verbose=verbose,
+            base_dir=base_dir,
             version=__version__,
             initialized=False,
         )
@@ -420,7 +421,7 @@ class DirEntry(FbBaseObject):
             raise ValueError(msg)
 
     # -------------------------------------------------------------------------
-    def as_dict(self, short=False):
+    def as_dict(self, short=True):
         """
         Transforms the elements of the object into a dict
 
@@ -433,6 +434,7 @@ class DirEntry(FbBaseObject):
 
         res = super(DirEntry, self).as_dict(short=short)
         res['is_dir'] = self.is_dir()
+        res['is_file'] = self.is_file()
         res['name'] = self.name
         res['permissions'] = str(self.perms)
         res['perms'] = self.perms.oct()
@@ -496,7 +498,7 @@ class DirEntry(FbBaseObject):
 
     # -------------------------------------------------------------------------
     @classmethod
-    def from_dir_line(cls, line, appname=None, verbose=0):
+    def from_dir_line(cls, line, appname=None, verbose=0, base_dir=None):
 
         line = line.strip()
         match = cls.re_dir_line.search(line)
@@ -504,7 +506,7 @@ class DirEntry(FbBaseObject):
             LOG.warn("Invalid line in FTP dir output %r.", line)
             return None
 
-        dir_entry = cls(appname=appname, verbose=verbose)
+        dir_entry = cls(appname=appname, verbose=verbose, base_dir=base_dir)
 
         dir_entry.perms = match.group(1)
         dir_entry.num_hardlinks = match.group(2)

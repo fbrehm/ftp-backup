@@ -60,6 +60,30 @@ class TestFtpHandler(FtpBackupTestcase):
             ftp_backup.ftp_dir.__version__))
 
     # -------------------------------------------------------------------------
+    def test_dir_entry(self):
+        """Test creating directory entry objects."""
+        LOG.info(self.get_method_doc())
+
+        test_data = (
+            { 'line': 'drwx---r-x   2 b082473  cust         8192 Jan  1  2014 2014-01-01_00',
+            },
+            { 'line': '-rw-r--r--   2 b082473  cust      1234567 May  1 08:20 2015-05-01_00',
+            },
+        )
+
+        from ftp_backup.ftp_dir import DirEntry
+
+        for test_entry in test_data:
+
+            line = test_entry['line']
+            LOG.debug("Testing line: " + line)
+
+            entry = DirEntry.from_dir_line(line, appname=self.appname, verbose=self.verbose)
+            LOG.debug("DirEntry: {!r}".format(entry))
+            if self.verbose > 1:
+                LOG.debug('DirEntry:\n' + pp(entry.as_dict()))
+
+    # -------------------------------------------------------------------------
     def test_import_ftp_handler(self):
 
         LOG.info("Test importing ftp_backup.ftp_handler ...")
@@ -145,6 +169,7 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
 
     suite.addTest(TestFtpHandler('test_import_ftp_dir', verbose))
+    suite.addTest(TestFtpHandler('test_dir_entry', verbose))
     # suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
     # suite.addTest(TestFtpHandler('test_handler_object', verbose))
     # suite.addTest(TestFtpHandler('test_handler_object_tls', verbose))
