@@ -9,6 +9,7 @@
 @summary: test script (and module) for unit tests on ftp handler object
 '''
 
+import datetime
 import os
 import sys
 import random
@@ -64,10 +65,36 @@ class TestFtpHandler(FtpBackupTestcase):
         """Test creating directory entry objects."""
         LOG.info(self.get_method_doc())
 
+        cur_year = datetime.date.today().year
+
         test_data = (
-            { 'line': 'drwx---r-x   2 b082473  cust         8192 Jan  1  2014 2014-01-01_00',
+            {   'line': (
+                    'drwx---r-x   2 b082473  cust         8192 '
+                    'Jan  1  2014 backup-dir.2014-01-01_00'),
+                'group': 'cust',
+                'is_dir': True,
+                'is_file': False,
+                'mtime': datetime.datetime(2014, 1, 1, 0, 0),
+                'name': 'backup-dir.2014-01-01_00',
+                'num_hardlinks': 2,
+                'permissions': 'drwx---r-x',
+                'perms_octal': '0o1705',
+                'size': 8192,
+                'user': 'b082473',
             },
-            { 'line': '-rw-r--r--   2 b082473  cust      1234567 May  1 08:20 2015-05-01_00',
+            {   'line': (
+                    '-rw-r--r--   1 b082473  cust      1234567 '
+                    'May  1 08:20 backup file 2015-05-01_00'),
+                'group': 'cust',
+                'is_dir': False,
+                'is_file': True,
+                'mtime': datetime.datetime(cur_year, 5, 1, 8, 20),
+                'name': 'backup file 2015-05-01_00',
+                'num_hardlinks': 1,
+                'permissions': '-rw-r--r--',
+                'perms_octal': '0o0644',
+                'size': 1234567,
+                'user': 'b082473',
             },
         )
 
@@ -82,6 +109,18 @@ class TestFtpHandler(FtpBackupTestcase):
             LOG.debug("DirEntry: {!r}".format(entry))
             if self.verbose > 1:
                 LOG.debug('DirEntry:\n' + pp(entry.as_dict()))
+            if self.verbose > 2:
+                LOG.debug('Expected values::\n' + pp(test_entry))
+            self.assertEqual(entry.group, test_entry['group'])
+            self.assertEqual(entry.is_dir(), test_entry['is_dir'])
+            self.assertEqual(entry.is_file(), test_entry['is_file'])
+            self.assertEqual(entry.mtime, test_entry['mtime'])
+            self.assertEqual(entry.name, test_entry['name'])
+            self.assertEqual(entry.num_hardlinks, test_entry['num_hardlinks'])
+            self.assertEqual(str(entry.perms), test_entry['permissions'])
+            self.assertEqual(entry.perms.oct(), test_entry['perms_octal'])
+            self.assertEqual(entry.size, test_entry['size'])
+            self.assertEqual(entry.user, test_entry['user'])
 
     # -------------------------------------------------------------------------
     def test_import_ftp_handler(self):

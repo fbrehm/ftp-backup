@@ -24,7 +24,7 @@ from fb_tools.common import to_str
 from fb_tools.obj import FbGenericBaseObject
 from fb_tools.obj import FbBaseObject
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 LOG = logging.getLogger(__name__)
 
@@ -82,18 +82,22 @@ class EntryPermissions(FbGenericBaseObject):
                 msg = "Invalid permission %d." % (permission)
                 raise ValueError(msg)
             self._permission = permission
-        elif isinstance(permission, six.string_types) or isinstance(permission, six.binary_type):
-            self._permission = self.to_int(permission)
-        else:
-            msg = "Invalid permission %r." % (permission)
-            raise ValueError(msg)
 
+        self._permission = self.to_int(permission)
         self._permission &= 0o1777
 
     # -------------------------------------------------------------------------
     @classmethod
     def to_int(cls, permission):
         """Typecast a permission string into an integer value."""
+        if isinstance(permission, int):
+            return permission
+
+        if not isinstance(permission, six.string_types) or isinstance(permission, six.binary_type):
+            msg = "Invalid type of permission {p!r} => {t}.".format(
+                p=permission, t=permission.__class__.__name__)
+            raise TypeError(msg)
+
         perm = 0
         v = to_str(permission)
         match = cls.re_from_str.search(v)
@@ -264,9 +268,8 @@ class EntryPermissions(FbGenericBaseObject):
 
 # =============================================================================
 class DirEntry(FbBaseObject):
+    """Encapsulation of a directory entry on the FTP server with all readable properties."""
 
-    # drwx---r-x   2 b082473  cust         8192 Jan  1  2014 2014-01-01_00
-    # drwx---r-x   2 b082473  cust         8192 May  1 08:20 2015-05-01_00
     pat_dir_line = r'^(\S{10})\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+'
     pat_dir_line += r'(\S+\s+\S+\s+\S+)\s+(.*)'
     re_dir_line = re.compile(pat_dir_line)
@@ -437,7 +440,8 @@ class DirEntry(FbBaseObject):
         res['is_file'] = self.is_file()
         res['name'] = self.name
         res['permissions'] = str(self.perms)
-        res['perms'] = self.perms.oct()
+        res['perms_octal'] = self.perms.oct()
+        res['perms'] = self.perms.permission
         res['num_hardlinks'] = self.num_hardlinks
         res['user'] = self.user
         res['group'] = self.group
