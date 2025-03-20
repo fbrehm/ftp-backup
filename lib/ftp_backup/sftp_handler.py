@@ -3,10 +3,11 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2015 by Frank Brehm, Berlin
+@copyright: © 2010 - 2025 by Frank Brehm, Berlin
 @license: GPL3
 @summary: General handler class for SFTP operations
 """
+from __future__ import absolute_import, print_function
 
 # Standard modules
 import logging
@@ -28,18 +29,20 @@ from pathlib import PurePath, PurePosixPath, Path, PosixPath
 import paramiko
 import six
 
+from fb_tools.common import bytes2human
+from fb_tools.common import pp
+from fb_tools.common import to_bool
+from fb_tools.common import to_str
+from fb_tools.errors import HandlerError
+from fb_tools.handler import BaseHandler
+
+
 # Own modules
-from pb_base.common import to_str_or_bust as to_str
-from pb_base.common import to_bool, pp, bytes2human
+from . import DEFAULT_LOCAL_DIRECTORY
+from . import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
+from . import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
 
-from pb_base.handler import PbBaseHandlerError
-from pb_base.handler import PbBaseHandler
-
-from ftp_backup import DEFAULT_LOCAL_DIRECTORY
-from ftp_backup import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
-from ftp_backup import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
-
-__version__ = '0.7.1'
+__version__ = '0.8.0'
 
 LOG = logging.getLogger(__name__)
 
@@ -54,7 +57,7 @@ DEFAULT_SSH_KEY = PosixPath(os.path.expanduser('~backup/.ssh/id_rsa'))
 
 
 # =============================================================================
-class SFTPHandlerError(PbBaseHandlerError):
+class SFTPHandlerError(HandlerError):
     """
     Base exception class for all exceptions belonging to issues
     in this module
@@ -152,10 +155,8 @@ class SFTPPutError(SFTPHandlerError):
 
 
 # =============================================================================
-class SFTPHandler(PbBaseHandler):
-    """
-    Handler class with additional properties and methods to handle SFTP operations.
-    """
+class SFTPHandler(BaseHandler):
+    """Handler class with additional properties and methods to handle SFTP operations."""
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -163,8 +164,7 @@ class SFTPHandler(PbBaseHandler):
             local_dir=DEFAULT_LOCAL_DIRECTORY, remote_dir=None,
             timeout=DEFAULT_SSH_TIMEOUT, key_file=DEFAULT_SSH_KEY,
             appname=None, base_dir=None, verbose=0, version=__version__,
-            use_stderr=False, simulate=False, sudo=False, quiet=False,
-            *targs, **kwargs):
+            simulate=False, sudo=False, quiet=False, *targs, **kwargs):
 
         self._host = DEFAULT_SSH_SERVER
         self._port = DEFAULT_SSH_PORT
@@ -195,17 +195,17 @@ class SFTPHandler(PbBaseHandler):
             verbose=verbose,
             version=version,
             base_dir=base_dir,
-            use_stderr=use_stderr,
             initialized=False,
             simulate=simulate,
             sudo=sudo,
             quiet=quiet,
+            *targs, **kwargs,
         )
 
         self.host = host
         self.port = port
         self.user = user
-        self.start_remote_dir = remote_dir
+        # self.start_remote_dir = remote_dir
         self.key_file = key_file
         self.local_dir = local_dir
 
@@ -890,5 +890,13 @@ class SFTPHandler(PbBaseHandler):
         (val, unit) = b_h.split(maxsplit=1)
         b_h_s = "%6s %s" % (val, unit)
         LOG.info("%-*s %13d Byte%s (%s)", max_len, total_s + ':', total, s, b_h_s)
+
+
+# =============================================================================
+if __name__ == '__main__':
+
+    pass
+
+# =============================================================================
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

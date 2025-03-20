@@ -7,6 +7,7 @@
 @license: GPL3
 @summary: General handler class for FTP operations
 """
+from __future__ import absolute_import, print_function
 
 # Standard modules
 import logging
@@ -21,14 +22,14 @@ from datetime import datetime
 # Third party modules
 import six
 
-# Own modules
 from fb_tools.common import to_bool, pp, bytes2human
 from fb_tools.errors import HandlerError
 from fb_tools.handler import BaseHandler
 
-from ftp_backup.ftp_dir import DirEntry
+# Own modules
+from .ftp_dir import DirEntry
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -565,5 +566,12 @@ class FTPHandler(BaseHandler):
                         self.handle_error(str(e), e.__class__.__name__, False)
                         time.sleep(2)
 
+
+# =============================================================================
+if __name__ == '__main__':
+
+    pass
+
+# =============================================================================
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
