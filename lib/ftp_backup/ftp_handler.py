@@ -27,9 +27,12 @@ from fb_tools.errors import HandlerError
 from fb_tools.handler import BaseHandler
 
 # Own modules
+from .errors import FTPCwdError
+from .errors import FTPPutError
+from .errors import FTPRemoveError
 from .ftp_dir import DirEntry
 
-__version__ = '0.5.1'
+__version__ = '0.6.0'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -46,63 +49,6 @@ VERIFY_OPTS = {
     'optional': ssl.CERT_OPTIONAL,
     'required': ssl.CERT_REQUIRED,
 }
-
-
-# =============================================================================
-class FTPHandlerError(HandlerError):
-    """
-    Base exception class for all exceptions belonging to issues
-    in this module
-    """
-    pass
-
-
-# =============================================================================
-class FTPCwdError(FTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, pathname, msg):
-
-        self._pathname = pathname
-        self._msg = msg
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        err_msg = "Error changing to remote directory %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg}
-
-
-# =============================================================================
-class FTPRemoveError(FTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, pathname, msg):
-
-        self._pathname = pathname
-        self._msg = msg
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        err_msg = "Error removing %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg}
-
-
-# =============================================================================
-class FTPPutError(FTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, pathname, msg):
-
-        self._pathname = pathname
-        self._msg = msg
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        err_msg = "Could not transfer file %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg}
 
 
 # =============================================================================

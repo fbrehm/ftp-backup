@@ -41,8 +41,14 @@ from fb_tools.handler import BaseHandler
 from . import DEFAULT_LOCAL_DIRECTORY
 from . import DEFAULT_COPIES_YEARLY, DEFAULT_COPIES_MONTHLY
 from . import DEFAULT_COPIES_WEEKLY, DEFAULT_COPIES_DAILY
+from .errors import SFTPCwdError
+from .errors import SFTPLocalPathError
+from .errors import SFTPPutError
+from .errors import SFTPRemoveError
+from .errors import SFTPSetOnConnectedError
+from .errors import SFTPSetOnNotConnectedError
 
-__version__ = '0.8.0'
+__version__ = '0.8.1'
 
 LOG = logging.getLogger(__name__)
 
@@ -54,104 +60,6 @@ DEFAULT_REMOTE_DIR = PurePosixPath(
 DEFAULT_SSH_TIMEOUT = 60
 MAX_SSH_TIMEOUT = 3600
 DEFAULT_SSH_KEY = PosixPath(os.path.expanduser('~backup/.ssh/id_rsa'))
-
-
-# =============================================================================
-class SFTPHandlerError(HandlerError):
-    """
-    Base exception class for all exceptions belonging to issues
-    in this module
-    """
-    pass
-
-
-# =============================================================================
-class SFTPLocalPathError(SFTPHandlerError):
-    """
-    Exception class for all exceptions belonging to local paths.
-    """
-    pass
-
-# =============================================================================
-class SFTPSetOnConnectedError(SFTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, prop, val):
-
-        self.prop = prop
-        self.val = val
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        return (
-            "Could not set property %(prop)r to %(val)r, because the client session "
-            "is already established.") % {'prop': self.prop, 'val': self.val}
-
-
-# =============================================================================
-class SFTPSetOnNotConnectedError(SFTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, prop, val):
-
-        self.prop = prop
-        self.val = val
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        return (
-            "Could not set property %(prop)r to %(val)r, because the client session "
-            "is still not established.") % {'prop': self.prop, 'val': self.val}
-
-
-# =============================================================================
-class SFTPCwdError(SFTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, pathname, msg):
-
-        self._pathname = pathname
-        self._msg = msg
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        err_msg = "Error changing to remote directory %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg}
-
-
-# =============================================================================
-class SFTPRemoveError(SFTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, pathname, msg):
-
-        self._pathname = pathname
-        self._msg = msg
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        err_msg = "Error removing %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg}
-
-
-# =============================================================================
-class SFTPPutError(SFTPHandlerError):
-
-    # -------------------------------------------------------------------------
-    def __init__(self, pathname, msg):
-
-        self._pathname = pathname
-        self._msg = msg
-
-    # -------------------------------------------------------------------------
-    def __str__(self):
-
-        err_msg = "Could not put file %(path)r: %(msg)s"
-        return err_msg % {'path': self._pathname, 'msg': self._msg}
 
 
 # =============================================================================

@@ -3,10 +3,11 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2015 by Frank Brehm, Berlin
+@copyright: © 2010 - 2025 by Frank Brehm, Berlin
 @license: GPL3
 @summary: Application class for script for backing up a directory to a FTP server
 """
+from __future__ import absolute_import, print_function
 
 # Standard modules
 import sys
