@@ -4,7 +4,7 @@
 @author: Frank Brehm
 @contact: frank.brehm@profitbricks.com
 @organization: Profitbricks GmbH
-@copyright: © 2010 - 2015 by Profitbricks GmbH
+@copyright: © 2010 - 2025 by Profitbricks GmbH
 @license: GPL3
 @summary: test script (and module) for unit tests on ftp handler object
 '''
@@ -16,6 +16,7 @@ import random
 import glob
 import logging
 import ftplib
+import textwrap
 
 from ftplib import FTP, FTP_TLS
 
@@ -52,87 +53,22 @@ class TestFtpHandler(FtpBackupTestcase):
         pass
 
     # -------------------------------------------------------------------------
-    def test_import_ftp_dir(self):
-        """"Test importing ftp_backup.ftp_dir."""
-        LOG.info(self.get_method_doc())
-
-        import ftp_backup.ftp_dir
-        LOG.debug('Version of ftp_backup.ftp_dir: {!r}'.format(
-            ftp_backup.ftp_dir.__version__))
-
-    # -------------------------------------------------------------------------
-    def test_dir_entry(self):
-        """Test creating directory entry objects."""
-        LOG.info(self.get_method_doc())
-
-        cur_year = datetime.date.today().year
-
-        test_data = (
-            {   'line': (
-                    'drwx---r-x   2 b082473  cust         8192 '
-                    'Jan  1  2014 backup-dir.2014-01-01_00'),
-                'group': 'cust',
-                'is_dir': True,
-                'is_file': False,
-                'mtime': datetime.datetime(2014, 1, 1, 0, 0),
-                'name': 'backup-dir.2014-01-01_00',
-                'num_hardlinks': 2,
-                'permissions': 'drwx---r-x',
-                'perms_octal': '0o1705',
-                'size': 8192,
-                'user': 'b082473',
-            },
-            {   'line': (
-                    '-rw-r--r--   1 b082473  cust      1234567 '
-                    'May  1 08:20 backup file 2015-05-01_00'),
-                'group': 'cust',
-                'is_dir': False,
-                'is_file': True,
-                'mtime': datetime.datetime(cur_year, 5, 1, 8, 20),
-                'name': 'backup file 2015-05-01_00',
-                'num_hardlinks': 1,
-                'permissions': '-rw-r--r--',
-                'perms_octal': '0o0644',
-                'size': 1234567,
-                'user': 'b082473',
-            },
-        )
-
-        from ftp_backup.ftp_dir import DirEntry
-
-        for test_entry in test_data:
-
-            line = test_entry['line']
-            LOG.debug("Testing line: " + line)
-
-            entry = DirEntry.from_dir_line(line, appname=self.appname, verbose=self.verbose)
-            LOG.debug("DirEntry: {!r}".format(entry))
-            if self.verbose > 1:
-                LOG.debug('DirEntry:\n' + pp(entry.as_dict()))
-            if self.verbose > 2:
-                LOG.debug('Expected values::\n' + pp(test_entry))
-            self.assertEqual(entry.group, test_entry['group'])
-            self.assertEqual(entry.is_dir(), test_entry['is_dir'])
-            self.assertEqual(entry.is_file(), test_entry['is_file'])
-            self.assertEqual(entry.mtime, test_entry['mtime'])
-            self.assertEqual(entry.name, test_entry['name'])
-            self.assertEqual(entry.num_hardlinks, test_entry['num_hardlinks'])
-            self.assertEqual(str(entry.perms), test_entry['permissions'])
-            self.assertEqual(entry.perms.oct(), test_entry['perms_octal'])
-            self.assertEqual(entry.size, test_entry['size'])
-            self.assertEqual(entry.user, test_entry['user'])
-
-    # -------------------------------------------------------------------------
     def test_import_ftp_handler(self):
+        """"Test importing ftp_backup.ftp_handler."""
+        LOG.info(self.get_method_doc())
 
-        LOG.info("Test importing ftp_backup.ftp_handler ...")
+        import ftp_backup.ftp_handler
+        LOG.debug('Version of ftp_backup.ftp_handler: {!r}'.format(
+            ftp_backup.ftp_handler.__version__))
 
-        import ftp_backup.ftp_handler                                   # noqa
+        LOG.info('Testing import of FTPHandler from ftp_backup.ftp_handler ...')
+        from ftp_backup.ftp_handler import FTPHandler
+        LOG.debug('Description of FTPHandler: ' + textwrap.dedent(FTPHandler.__doc__))
 
     # -------------------------------------------------------------------------
     def test_handler_object(self):
-
-        LOG.info("Testing init of a FTP handler object ...")
+        """Testing init of a FTP handler object."""
+        LOG.info(self.get_method_doc())
 
         from ftp_backup.ftp_handler import FTPHandler
         from ftp_backup.ftp_handler import DEFAULT_FTP_HOST
@@ -207,11 +143,9 @@ if __name__ == '__main__':
 
     suite = unittest.TestSuite()
 
-    suite.addTest(TestFtpHandler('test_import_ftp_dir', verbose))
-    suite.addTest(TestFtpHandler('test_dir_entry', verbose))
-    # suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
-    # suite.addTest(TestFtpHandler('test_handler_object', verbose))
-    # suite.addTest(TestFtpHandler('test_handler_object_tls', verbose))
+    suite.addTest(TestFtpHandler('test_import_ftp_handler', verbose))
+    suite.addTest(TestFtpHandler('test_handler_object', verbose))
+    suite.addTest(TestFtpHandler('test_handler_object_tls', verbose))
 
     runner = unittest.TextTestRunner(verbosity=verbose)
 

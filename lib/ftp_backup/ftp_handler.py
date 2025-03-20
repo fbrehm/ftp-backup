@@ -22,14 +22,13 @@ from datetime import datetime
 import six
 
 # Own modules
-from pb_base.common import to_bool, pp, bytes2human
-
-from pb_base.handler import PbBaseHandlerError
-from pb_base.handler import PbBaseHandler
+from fb_tools.common import to_bool, pp, bytes2human
+from fb_tools.errors import HandlerError
+from fb_tools.handler import BaseHandler
 
 from ftp_backup.ftp_dir import DirEntry
 
-__version__ = '0.4.2'
+__version__ = '0.5.0'
 
 LOG = logging.getLogger(__name__)
 DEFAULT_FTP_HOST = 'ftp'
@@ -49,7 +48,7 @@ VERIFY_OPTS = {
 
 
 # =============================================================================
-class FTPHandlerError(PbBaseHandlerError):
+class FTPHandlerError(HandlerError):
     """
     Base exception class for all exceptions belonging to issues
     in this module
@@ -106,10 +105,8 @@ class FTPPutError(FTPHandlerError):
 
 
 # =============================================================================
-class FTPHandler(PbBaseHandler):
-    """
-    Handler class with additional properties and methods to handle FTP operations.
-    """
+class FTPHandler(BaseHandler):
+    """Handler class with additional properties and methods to handle FTP operations."""
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -118,8 +115,7 @@ class FTPHandler(PbBaseHandler):
             tls_verify=None, tz=DEFAULT_FTP_TZ, timeout=DEFAULT_FTP_TIMEOUT,
             max_stor_attempts=DEFAULT_MAX_STOR_ATTEMPTS,
             appname=None, verbose=0, version=__version__, base_dir=None,
-            use_stderr=False, simulate=False, sudo=False, quiet=False,
-            *targs, **kwargs):
+            simulate=False, sudo=False, quiet=False, *targs, **kwargs):
         """Initialization of the FTPHandler object.
 
         @raise FTPHandlerError: on an uncoverable error.
@@ -148,11 +144,11 @@ class FTPHandler(PbBaseHandler):
             verbose=verbose,
             version=version,
             base_dir=base_dir,
-            use_stderr=use_stderr,
             initialized=False,
             simulate=simulate,
             sudo=sudo,
             quiet=quiet,
+            *targs, **kwargs,
         )
 
         self.remote_dir = remote_dir
